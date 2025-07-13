@@ -1,20 +1,295 @@
 // ============================================================
 // 9. Custom Fields, Form Handlers, Track Data Injection & SPA Routing
 // (extracted from BeatpassOptimizedIntegration.js)
+// OPTIMIZED VERSION: Uses app foundation for better performance
 // ============================================================
 (function () {
+    'use strict';
+    
     // ---------------------------
-    // API and Global Constants
+    // Centralized Initialization State Manager
+    // ---------------------------
+    const InitializationManager = {
+        isInitialized: false,
+        isInitializing: false,
+        initPromise: null,
+        observers: new Map(),
+        eventListeners: new Map(),
+        
+        async init() {
+            if (this.isInitialized || this.isInitializing) {
+                return this.initPromise;
+            }
+            
+            this.isInitializing = true;
+            this.initPromise = this._performInit();
+            
+            try {
+                await this.initPromise;
+                this.isInitialized = true;
+            } catch (error) {
+                console.error('[CustomFields] Initialization failed:', error);
+            } finally {
+                this.isInitializing = false;
+            }
+            
+            return this.initPromise;
+        },
+        
+        async _performInit() {
+            console.log('[CustomFields] Starting initialization...');
+            
+            // Wait for coordinator if available
+            if (typeof waitForCoordinator === 'function') {
+                try {
+                    await waitForCoordinator();
+                } catch (error) {
+                    console.warn('[CustomFields] Coordinator not available, proceeding without it');
+                }
+            }
+            
+            // Initialize components
+            await this._initializeComponents();
+            
+            console.log('[CustomFields] Initialization complete');
+        },
+        
+        async _initializeComponents() {
+            // Initialize cache
+            initializeCache();
+            
+            // Setup page-specific functionality
+            if (isUploadPage() || isEditPage()) {
+                await safeInject(injectCustomFields);
+            }
+            
+            if (isTrackPage()) {
+                await safeInject(injectTrackData);
+            }
+            
+            // Setup observers and event listeners
+            this._setupObservers();
+            this._setupEventListeners();
+        },
+        
+        _setupObservers() {
+            // Clear existing observers
+            this.observers.forEach(observer => observer.disconnect());
+            this.observers.clear();
+            
+            // Setup form observer
+            const formObserver = new MutationObserver(debounce((mutations) => {
+                let shouldReinject = false;
+                
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList') {
+                        const addedNodes = Array.from(mutation.addedNodes);
+                        const hasFormChanges = addedNodes.some(node =>
+                            node.nodeType === Node.ELEMENT_NODE &&
+                            (node.matches?.('form, .form-container, [data-form]') ||
+                             node.querySelector?.('form, .form-container, [data-form]'))
+                        );
+                        
+                        if (hasFormChanges) {
+                            shouldReinject = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (shouldReinject) {
+                    console.log('[CustomFields] Form changes detected, re-injecting...');
+                    this._reinjectFields();
+                }
+            }, 300));
+            
+            formObserver.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: false,
+                characterData: false
+            });
+            
+            this.observers.set('form', formObserver);
+        },
+        
+        _setupEventListeners() {
+            // Clear existing listeners
+            this.eventListeners.forEach(({ element, event, handler }) => {
+                element.removeEventListener(event, handler);
+            });
+            this.eventListeners.clear();
+            
+            // Setup navigation listeners
+            const navigationHandler = debounce(() => {
+                console.log('[CustomFields] Navigation detected, re-initializing...');
+                this._handleNavigation();
+            }, 100);
+            
+            window.addEventListener('popstate', navigationHandler);
+            this.eventListeners.set('popstate', { element: window, event: 'popstate', handler: navigationHandler });
+            
+            // Listen for custom navigation events
+            const customNavHandler = debounce(() => {
+                this._handleNavigation();
+            }, 100);
+            
+            ['routechange', 'navigationend', 'spa-route-change'].forEach(eventName => {
+                window.addEventListener(eventName, customNavHandler);
+                this.eventListeners.set(eventName, { element: window, event: eventName, handler: customNavHandler });
+            });
+        },
+        
+        async _handleNavigation() {
+            // Reset state for new page
+            isFieldsInjected = false;
+            fieldsReady = false;
+            
+            // Re-initialize for new page
+            await this._initializeComponents();
+        },
+        
+        async _reinjectFields() {
+            if (isUploadPage() || isEditPage()) {
+                isFieldsInjected = false;
+                await safeInject(injectCustomFields);
+            }
+        },
+        
+        cleanup() {
+            console.log('[CustomFields] Cleaning up...');
+            
+            // Disconnect observers
+            this.observers.forEach(observer => observer.disconnect());
+            this.observers.clear();
+            
+            // Remove event listeners
+            this.eventListeners.forEach(({ element, event, handler }) => {
+                element.removeEventListener(event, handler);
+            });
+            this.eventListeners.clear();
+            
+            // Clear cache
+            apiCache.clear();
+            pendingRequests.clear();
+            
+            // Reset state
+            this.isInitialized = false;
+            this.isInitializing = false;
+            this.initPromise = null;
+        }
+    };
+    
+    // ---------------------------
+    // Enhanced API and Global Constants
     // ---------------------------
     const API_URL = 'https://open.beatpass.ca/key_bpm_handler.php';
     const MAX_RETRIES_UPLOAD = 10, RETRY_DELAY = 300;
     const MAX_RETRIES_TRACK = 15, RETRY_DELAY_TRACK = 200;
+    const API_TIMEOUT = 10000; // 10 seconds
+    const CACHE_DURATION = 300000; // 5 minutes
+    
     let isFieldsInjected = false, fieldsReady = false, retryAttempts = 0;
     let lastTrackPath = '', trackObserver = null;
     let fieldsObserver = null;
+    
+    // Enhanced caching system
+    const apiCache = new Map();
+    const pendingRequests = new Map();
+    let cachedBootstrapData = null;
+    let cachedApiHeaders = null;
+    
+    // Performance monitoring
+    const performanceMetrics = {
+        apiCalls: 0,
+        cacheHits: 0,
+        domOperations: 0,
+        errors: 0
+    };
+    
+    // Enhanced API function with caching and timeout
+    async function makeApiRequest(url, options = {}) {
+        const cacheKey = `${url}_${JSON.stringify(options)}`;
+        
+        // Check cache first
+        const cached = apiCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+            performanceMetrics.cacheHits++;
+            return cached.data;
+        }
+        
+        // Check if request is already pending
+        if (pendingRequests.has(cacheKey)) {
+            return pendingRequests.get(cacheKey);
+        }
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+        
+        const requestPromise = fetch(url, {
+            ...options,
+            signal: controller.signal,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        }).then(async response => {
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            // Cache successful responses
+            apiCache.set(cacheKey, {
+                data,
+                timestamp: Date.now()
+            });
+            
+            performanceMetrics.apiCalls++;
+            return data;
+        }).catch(error => {
+            clearTimeout(timeoutId);
+            performanceMetrics.errors++;
+            throw error;
+        }).finally(() => {
+            pendingRequests.delete(cacheKey);
+        });
+        
+        pendingRequests.set(cacheKey, requestPromise);
+        return requestPromise;
+    }
+    
+    // Initialize cached data
+    function initializeCache() {
+        try {
+            // Access bootstrap data if available
+            if (window.bootstrapData) {
+                cachedBootstrapData = typeof window.bootstrapData === 'string' 
+                    ? JSON.parse(window.bootstrapData) 
+                    : window.bootstrapData;
+                    
+                // Extract API headers from bootstrap data
+                if (cachedBootstrapData?.settings?.base_url) {
+                    cachedApiHeaders = {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    };
+                }
+            }
+        } catch (error) {
+            console.warn('Could not cache bootstrap data:', error);
+        }
+    }
+    
+    // Initialize cache on load
+    initializeCache();
 
     // ---------------------------
-    // Utility Functions
+    // Utility Functions (Optimized)
     // ---------------------------
     function debounce(func, wait) {
         let timeout;
@@ -28,23 +303,36 @@
         };
     }
 
-    function waitForElement(selector, timeout = 10000) {
+    // Optimized element waiting using MutationObserver with specific target
+    function waitForElement(selector, timeout = 10000, targetNode = document.body) {
         return new Promise((resolve, reject) => {
-            const element = document.querySelector(selector);
+            const element = targetNode.querySelector(selector);
             if (element) {
                 resolve(element);
                 return;
             }
 
-            const observer = new MutationObserver(() => {
-                const element = document.querySelector(selector);
+            const observer = new MutationObserver((mutations, obs) => {
+                // Only check mutations that actually added nodes
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                        const element = targetNode.querySelector(selector);
                 if (element) {
-                    observer.disconnect();
+                            obs.disconnect();
                     resolve(element);
+                            return;
+                        }
+                    }
                 }
             });
 
-            observer.observe(document.body, { childList: true, subtree: true });
+            observer.observe(targetNode, { 
+                childList: true, 
+                subtree: true,
+                // Optimize by not observing attributes
+                attributes: false,
+                characterData: false
+            });
 
             setTimeout(() => {
                 observer.disconnect();
@@ -119,34 +407,83 @@
     }
 
     // ---------------------------
-    // Debounced Injection Functions (with anti-flash protection)
+    // Enhanced Injection System with Promise-based Queue
     // ---------------------------
-    const debouncedInjectCustomFields = debounce(injectCustomFields, 200);
-    const debouncedInjectFingerprintDashboard = debounce(injectFingerprintDashboard, 200);
-    const debouncedUpdateDashboardContent = debounce(updateDashboardContent, 150);
-    const debouncedInjectBPMColumn = debounce(injectBPMColumn, 300);
-    const debouncedInjectTrackData = debounce(injectTrackData, 100);
-    
-    // Global flag to prevent multiple simultaneous injections
-    let isCurrentlyInjecting = false;
-    
-    // Wrapper to prevent injection flashing
-    function safeInject(injectionFunction, ...args) {
-        if (isCurrentlyInjecting) {
-            console.log("⚠️ Injection already in progress, skipping duplicate call");
-            return;
-        }
+    const InjectionManager = {
+        isInjecting: false,
+        injectionQueue: [],
         
-        isCurrentlyInjecting = true;
-        try {
-            injectionFunction(...args);
-        } finally {
-            // Reset flag after injection completes
-            setTimeout(() => {
-                isCurrentlyInjecting = false;
-            }, 100);
+        async safeInject(injectionFunction, ...args) {
+            return new Promise((resolve, reject) => {
+                const injectionTask = {
+                    function: injectionFunction,
+                    args,
+                    resolve,
+                    reject
+                };
+                
+                this.injectionQueue.push(injectionTask);
+                this._processQueue();
+            });
+        },
+        
+        async _processQueue() {
+            if (this.isInjecting || this.injectionQueue.length === 0) {
+                return;
+            }
+            
+            this.isInjecting = true;
+            
+            while (this.injectionQueue.length > 0) {
+                const task = this.injectionQueue.shift();
+                
+                try {
+                    // Use requestAnimationFrame for smooth DOM updates
+                    await new Promise(resolve => {
+                        requestAnimationFrame(async () => {
+                            try {
+                                const result = await task.function(...task.args);
+                                task.resolve(result);
+                            } catch (error) {
+                                console.error('[CustomFields] Injection failed:', error);
+                                task.reject(error);
+                            }
+                            resolve();
+                        });
+                    });
+                    
+                    // Small delay between injections to prevent overwhelming the DOM
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                    
+                } catch (error) {
+                    console.error('[CustomFields] Injection task failed:', error);
+                    task.reject(error);
+                }
+            }
+            
+            this.isInjecting = false;
+        },
+        
+        clearQueue() {
+            this.injectionQueue.forEach(task => {
+                task.reject(new Error('Injection queue cleared'));
+            });
+            this.injectionQueue = [];
+            this.isInjecting = false;
         }
+    };
+    
+    // Wrapper function for backward compatibility
+    async function safeInject(injectionFunction, ...args) {
+        return InjectionManager.safeInject(injectionFunction, ...args);
     }
+    
+    // Debounced injection functions
+    const debouncedInjectCustomFields = debounce(() => safeInject(injectCustomFields), 200);
+    const debouncedInjectFingerprintDashboard = debounce(() => safeInject(injectFingerprintDashboard), 200);
+    const debouncedUpdateDashboardContent = debounce(() => safeInject(updateDashboardContent), 150);
+    const debouncedInjectBPMColumn = debounce(() => safeInject(injectBPMColumn), 300);
+    const debouncedInjectTrackData = debounce((data) => safeInject(injectTrackData, data), 100);
     
     // ---------------------------
     // Custom Field Creation with Native UI
@@ -5004,41 +5341,6 @@
                                  </div>
                              </div>
                          </div>
-                        
-                                                 <div class="p-10 rounded-lg bg-gray-500/5 border border-gray-500/15 mb-12">
-                             <div class="flex items-center gap-6 text-xs font-medium text-gray-300 mb-6">
-                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="#9ca3af">
-                                     <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-                                 </svg>
-                                 Recommended Actions:
-                             </div>
-                             <div class="text-xs text-white/60 leading-relaxed space-y-2">
-                                 <div class="flex items-start gap-6">
-                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-gray-400 flex-shrink-0 mt-0.5">
-                                         <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                                     </svg>
-                                     <span><strong>If you're the original producer:</strong> Contact support to verify ownership</span>
-                                 </div>
-                                 <div class="flex items-start gap-6">
-                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-gray-400 flex-shrink-0 mt-0.5">
-                                         <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                                     </svg>
-                                     <span><strong>If this is a remix/variation:</strong> Clearly label as such and ensure proper licensing</span>
-                                 </div>
-                                 <div class="flex items-start gap-6">
-                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-gray-400 flex-shrink-0 mt-0.5">
-                                         <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                                     </svg>
-                                     <span><strong>If unauthorized:</strong> Remove this upload to avoid account penalties</span>
-                                 </div>
-                                 <div class="flex items-start gap-6">
-                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-gray-400 flex-shrink-0 mt-0.5">
-                                         <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                                     </svg>
-                                     <span><strong>Create original content:</strong> Upload unique beats to avoid duplication issues</span>
-                                 </div>
-                             </div>
-                         </div>
                          
                          <div class="p-10 rounded-lg bg-red-500/5 border border-red-500/15">
                              <div class="flex items-center gap-6 text-xs font-medium text-red-300 mb-6">
@@ -5761,6 +6063,12 @@
     }
 
     function injectTrackData(data) {
+        // Add safety check for data parameter
+        if (!data || typeof data !== 'object') {
+            console.warn('[CustomFields] injectTrackData: Invalid data parameter', data);
+            return;
+        }
+        
         const container = getInfoContainer();
         if (!container) return;
         
@@ -5793,6 +6101,12 @@
     }
     
     function injectNewTrackData(data, container) {
+        // Add safety check for data parameter
+        if (!data || typeof data !== 'object') {
+            console.warn('[CustomFields] injectNewTrackData: Invalid data parameter', data);
+            return;
+        }
+        
         const elements = [];
         if (data.key_name) elements.push(createDataElement('custom-key', data.key_name));
         if (data.scale) elements.push(createDataElement('custom-scale', data.scale));
@@ -5881,61 +6195,37 @@
         window.addEventListener("pushState", handleTrackURLChange);
     }
 
+    // Legacy DOMContentLoaded handler - replaced by InitializationManager
+    // Keeping for backward compatibility but delegating to new system
     document.addEventListener("DOMContentLoaded", () => {
-        if (isUploadPage()) {
-            observeFormChanges();
-            attachUploadListeners();
-            observeConfirmationPage();
-            return;
-        }
-        // For edit/track/other pages, keep original logic
-        if (isEditPage()) {
-            fetchExistingCustomData();
-            const form = document.querySelector('form');
-            if (form) {
-                form.removeEventListener('submit', handleFormSubmission);
-                form.addEventListener('submit', handleFormSubmission);
-                // Inject Fingerprint Dashboard
-                debouncedInjectFingerprintDashboard();
-                // Observe duration field
-                observeDurationField();
-            }
-        }
-        // Always initialize track page functionality
-        initTrackPage();
-        observeTrackChanges();
-        window.addEventListener("pageshow", () => {
-            if (isConfirmationPage()) processPendingCustomDataOnConfirmation();
-        });
+        InitializationManager.init();
         window.processPendingCustomDataOnConfirmation = processPendingCustomDataOnConfirmation;
     });
 
-    // Initialize on various events
-    document.addEventListener("DOMContentLoaded", robustInitialize);
-    window.addEventListener("load", robustInitialize);
+    // Enhanced initialization - now handled by InitializationManager
+    // Fallback initialization for immediate execution if DOM is already ready
+    if (document.readyState !== 'loading') {
+        InitializationManager.init();
+    }
     
-    // Handle SPA navigation
-    ['popstate', 'pushState', 'spa-route-change'].forEach(event => {
-        window.addEventListener(event, () => {
-            setTimeout(() => {
-                robustInitialize();
-                // Also specifically handle track page navigation
-                if (isTrackPage()) {
-                    initTrackPage();
-                    if (!trackObserver) {
-                        observeTrackChanges();
-                    }
-                }
-            }, 100);
-        });
+    // SPA Navigation handling - delegate to InitializationManager
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    
+    history.pushState = function(...args) {
+        originalPushState.apply(history, args);
+        InitializationManager._handleNavigation();
+    };
+    
+    history.replaceState = function(...args) {
+        originalReplaceState.apply(history, args);
+        InitializationManager._handleNavigation();
+    };
+    
+    window.addEventListener('popstate', () => InitializationManager._handleNavigation());
+    window.addEventListener('pageshow', () => {
+        if (isConfirmationPage()) processPendingCustomDataOnConfirmation();
     });
-
-    // Fallback: periodic check (reduced frequency)
-    setInterval(() => {
-        if (isEditPage() || isUploadPage() || isTrackPage()) {
-            robustInitialize();
-        }
-    }, 5000);
 
     // Expose main inits to global scope for late-injected script support
     window.robustInitialize = robustInitialize;
@@ -6223,47 +6513,64 @@
     }
 
     async function updateBPMDataProgressively(dataRows) {
+        // Validate input
+        if (!dataRows || !dataRows.length) {
+            console.warn('No data rows provided for BPM update');
+            return;
+        }
+        
+        // Convert to array if it's a NodeList
+        const rowsArray = Array.isArray(dataRows) ? dataRows : Array.from(dataRows);
+        
         // Process rows in batches to avoid overwhelming the server
         const batchSize = 3;
         
-        for (let i = 0; i < dataRows.length; i += batchSize) {
-            const batch = Array.from(dataRows).slice(i, i + batchSize);
-            
-            // Process batch concurrently
-            await Promise.all(batch.map(async (row) => {
-                const trackName = extractTrackNameFromRow(row);
-                let bpm = null;
+        try {
+            for (let i = 0; i < rowsArray.length; i += batchSize) {
+                const batch = rowsArray.slice(i, i + batchSize);
                 
-                if (trackName) {
-                    bpm = await fetchBPMByTrackName(trackName);
-                }
-                
-                // Update the BPM cell
-                const bpmCell = row.querySelector('.custom-bpm-cell');
-                if (bpmCell) {
-                    const wrapper = bpmCell.querySelector('div');
-                    if (wrapper) {
-                        // Smooth fade out current content
-                        wrapper.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
-                        wrapper.style.opacity = '0';
-                        wrapper.style.transform = 'translateY(-2px)';
+                // Process batch concurrently with error handling
+                await Promise.allSettled(batch.map(async (row) => {
+                    try {
+                        const trackName = extractTrackNameFromRow(row);
+                        let bpm = null;
                         
-                        // Update content after fade out
-                        setTimeout(() => {
-                            wrapper.textContent = bpm || '-';
-                            // Smooth fade in new content
-                            wrapper.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
-                            wrapper.style.opacity = '1';
-                            wrapper.style.transform = 'translateY(0)';
-                        }, 200);
+                        if (trackName) {
+                            bpm = await fetchBPMByTrackName(trackName);
+                        }
+                        
+                        // Update the BPM cell
+                        const bpmCell = row.querySelector('.custom-bpm-cell');
+                        if (bpmCell) {
+                            const wrapper = bpmCell.querySelector('div');
+                            if (wrapper) {
+                                // Smooth fade out current content
+                                wrapper.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+                                wrapper.style.opacity = '0';
+                                wrapper.style.transform = 'translateY(-2px)';
+                                
+                                // Update content after fade out
+                                setTimeout(() => {
+                                    wrapper.textContent = bpm || '-';
+                                    // Smooth fade in new content
+                                    wrapper.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+                                    wrapper.style.opacity = '1';
+                                    wrapper.style.transform = 'translateY(0)';
+                                }, 200);
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Error updating BPM for row:', error);
                     }
+                }));
+                
+                // Small delay between batches to prevent overwhelming
+                if (i + batchSize < rowsArray.length) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
-            }));
-            
-            // Small delay between batches to prevent overwhelming
-            if (i + batchSize < dataRows.length) {
-                await new Promise(resolve => setTimeout(resolve, 100));
             }
+        } catch (error) {
+            console.error('Error in BPM data progressive update:', error);
         }
     }
 
@@ -7388,4 +7695,4 @@
     window.createExclusiveLicensingDisplay = createExclusiveLicensingDisplay;
 
     // ... existing code continues ...
-})(); 
+})();

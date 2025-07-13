@@ -4,11 +4,24 @@
 (function() {
     // Utility: Save to cache
     function saveToCache(key, data, ttl) {
+        // Use VerifiedProducersInitManager cache if available
+        if (window.VerifiedProducersInitManager && window.VerifiedProducersInitManager.cacheManager) {
+            return window.VerifiedProducersInitManager.cacheManager.saveToCache(key, data, ttl);
+        }
+        
+        // Fallback to original cache implementation
         const payload = { value: data, expiry: Date.now() + ttl };
         localStorage.setItem(key, JSON.stringify(payload));
     }
+    
     // Utility: Get from cache
     function getFromCache(key) {
+        // Use VerifiedProducersInitManager cache if available
+        if (window.VerifiedProducersInitManager && window.VerifiedProducersInitManager.cacheManager) {
+            return window.VerifiedProducersInitManager.cacheManager.getFromCache(key);
+        }
+        
+        // Fallback to original cache implementation
         const item = JSON.parse(localStorage.getItem(key) || 'null');
         if (!item) return null;
         if (Date.now() > item.expiry) {
@@ -20,6 +33,12 @@
 
     // Fetch the central JSON of verified producers, with caching
     async function fetchCentralJSON(forceRefresh = false) {
+        // Use VerifiedProducersInitManager API if available
+        if (window.VerifiedProducersInitManager && window.VerifiedProducersInitManager.apiManager) {
+            return await window.VerifiedProducersInitManager.apiManager.fetchVerifiedProducers(forceRefresh);
+        }
+        
+        // Fallback to original API implementation
         const cacheKey = "verifiedProducers", ttl = 10 * 60 * 1000;
         if (!forceRefresh) {
             const cached = getFromCache(cacheKey);
@@ -38,6 +57,12 @@
 
     // Send update to backend if verification status changes
     async function sendProducerVerificationUpdate(producerName, isVerified) {
+        // Use VerifiedProducersInitManager API if available
+        if (window.VerifiedProducersInitManager && window.VerifiedProducersInitManager.apiManager) {
+            return await window.VerifiedProducersInitManager.apiManager.updateProducerVerification(producerName, isVerified);
+        }
+        
+        // Fallback to original API implementation
         const url = `https://open.beatpass.ca/updateVerifiedProducers.php?producerName=${encodeURIComponent(producerName)}&verifiedStatus=${isVerified}`;
         try {
             const res = await fetch(url, { method: "GET" });
@@ -47,6 +72,12 @@
 
     // Insert the verified badge SVG into the given container
     function insertVerifiedBadge(container, context = "") {
+        // Use VerifiedProducersInitManager badge manager if available
+        if (window.VerifiedProducersInitManager && window.VerifiedProducersInitManager.badgeManager) {
+            return window.VerifiedProducersInitManager.badgeManager.insertBadge(container, context);
+        }
+        
+        // Fallback to original badge insertion
         if (container.querySelector(".verified-badge")) return;
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, "svg");
@@ -71,6 +102,12 @@
 
     // Render badges from the cached verified producers list
     async function renderBadgesFromCache(verifiedProducers) {
+        // Use VerifiedProducersInitManager badge manager if available
+        if (window.VerifiedProducersInitManager && window.VerifiedProducersInitManager.badgeManager) {
+            return await window.VerifiedProducersInitManager.badgeManager.renderBadges();
+        }
+        
+        // Fallback to original badge rendering
         document.querySelectorAll('h1.text-2xl.md\\:text-4xl.font-semibold.mb-14.text-center.md\\:text-start')
             .forEach(titleEl => {
                 const name = titleEl.textContent.trim();
@@ -85,6 +122,12 @@
 
     // Check and update producer verification status
     async function checkProducerVerification() {
+        // Use VerifiedProducersInitManager badge manager if available
+        if (window.VerifiedProducersInitManager && window.VerifiedProducersInitManager.badgeManager) {
+            return await window.VerifiedProducersInitManager.badgeManager.checkProducerVerification();
+        }
+        
+        // Fallback to original verification checking
         if (!window.location.href.includes("/artist/")) return;
         const nameEl = document.querySelector('h1.text-2xl.md\\:text-4xl.font-semibold.mb-14.text-center.md\\:text-start');
         if (!nameEl) return;
@@ -110,13 +153,33 @@
 
     // Set up a MutationObserver to re-apply badges on DOM changes
     function setupVerifiedBadgeObserver() {
+        // Use VerifiedProducersInitManager if available for centralized observer management
+        if (window.VerifiedProducersInitManager && window.VerifiedProducersInitManager.isInitialized()) {
+            console.log('[VerifiedProducers] MutationObserver managed by VerifiedProducersInitManager');
+            return; // Manager handles the observer
+        }
+        
+        // Fallback to original observer setup
         const observer = new MutationObserver(() => applyVerifiedBadges());
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
     // Initialize the badge logic on DOMContentLoaded
-    (async function initializeVerifiedBadges() {
-        await applyVerifiedBadges();
-        setupVerifiedBadgeObserver();
-    })();
-})(); 
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            // Use VerifiedProducersInitManager if available
+            if (window.VerifiedProducersInitManager) {
+                console.log('[VerifiedProducers] Using VerifiedProducersInitManager for initialization');
+                await window.VerifiedProducersInitManager.init();
+            } else {
+                // Fallback to original initialization
+                console.log('[VerifiedProducers] Using fallback initialization');
+                await fetchCentralJSON();
+                await applyVerifiedBadges();
+                setupVerifiedBadgeObserver();
+            }
+        } catch (error) {
+            console.error('Error initializing verified producers:', error);
+        }
+    });
+})();

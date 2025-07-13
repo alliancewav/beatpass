@@ -10,6 +10,12 @@
     const discMap = new WeakMap();
 
     function attachSpinLogic(img) {
+        // Use CDSpinInitManager attachment if available
+        if (window.CDSpinInitManager && window.CDSpinInitManager.attachSpinLogic) {
+            return window.CDSpinInitManager.attachSpinLogic(img);
+        }
+        
+        // Fallback to original attachment logic
         if (img.dataset.cdSpin === "true") return;
         img.dataset.cdSpin = "true";
         const baseSpeed = BASE_SPEED_MIN + Math.random() * (BASE_SPEED_MAX - BASE_SPEED_MIN);
@@ -30,6 +36,12 @@
 
     let lastUpdateTime = 0, frameInterval = 1000 / MAX_FPS;
     function animateAll(now) {
+        // Use CDSpinInitManager animation if available
+        if (window.CDSpinInitManager && window.CDSpinInitManager.isInitialized()) {
+            return; // Manager handles animation
+        }
+        
+        // Fallback to original animation
         requestAnimationFrame(animateAll);
         const dtMillis = now - lastUpdateTime;
         if (dtMillis < frameInterval) return;
@@ -43,45 +55,79 @@
             d.el.style.transform = `rotate(${d.angle}deg) scale(${d.scale})`;
         });
     }
-    requestAnimationFrame(animateAll);
+    
+    // Only start animation if manager is not available
+    if (!window.CDSpinInitManager) {
+        requestAnimationFrame(animateAll);
+    }
 
-    const io = new IntersectionObserver(entries => {
-        entries.forEach(entry => {
-            const d = discMap.get(entry.target);
-            if (d) d.isInView = entry.isIntersecting;
-        });
-    }, { root: null, threshold: 0.01 });
+    // Create intersection observer only if manager is not available
+    let io;
+    if (!window.CDSpinInitManager) {
+        io = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                const d = discMap.get(entry.target);
+                if (d) d.isInView = entry.isIntersecting;
+            });
+        }, { root: null, threshold: 0.01 });
+    }
 
     function scanForTrackImages() {
+        // Use CDSpinInitManager scanner if available
+        if (window.CDSpinInitManager && window.CDSpinInitManager.scanManager) {
+            return window.CDSpinInitManager.scanManager.scanForTrackImages();
+        }
+        
+        // Fallback to original scanning
         document.querySelectorAll('img[src*="track_image"]').forEach(img => {
             attachSpinLogic(img);
-            io.observe(img);
+            if (io) io.observe(img);
         });
     }
 
-    const mutObserver = new MutationObserver(mutations => {
-        mutations.forEach(mut => {
-            mut.addedNodes.forEach(node => {
-                if (node.nodeType === 1 && node.tagName === "IMG" && node.src.includes("track_image")) {
-                    attachSpinLogic(node);
-                    io.observe(node);
-                }
+    // Create mutation observer only if manager is not available
+    let mutObserver;
+    if (!window.CDSpinInitManager) {
+        mutObserver = new MutationObserver(mutations => {
+            mutations.forEach(mut => {
+                mut.addedNodes.forEach(node => {
+                    if (node.nodeType === 1 && node.tagName === "IMG" && node.src.includes("track_image")) {
+                        attachSpinLogic(node);
+                        if (io) io.observe(node);
+                    }
+                });
             });
         });
-    });
+    }
 
     function pruneDeadDiscs() {
+        // Use CDSpinInitManager cleanup if available
+        if (window.CDSpinInitManager && window.CDSpinInitManager.scanManager) {
+            return window.CDSpinInitManager.scanManager.pruneDeadDiscs();
+        }
+        
+        // Fallback to original cleanup
         for (let i = discs.length - 1; i >= 0; i--) {
             if (!document.body.contains(discs[i].el)) {
-                io.unobserve(discs[i].el);
+                if (io) io.unobserve(discs[i].el);
                 discs.splice(i, 1);
             }
         }
     }
 
     function initCDSpin() {
+        // Use CDSpinInitManager if available
+        if (window.CDSpinInitManager) {
+            console.log('[CDSpin] Using CDSpinInitManager for initialization');
+            return window.CDSpinInitManager.init();
+        }
+        
+        // Fallback to original initialization
+        console.log('[CDSpin] Using fallback initialization');
         scanForTrackImages();
-        mutObserver.observe(document.body, { childList: true, subtree: true });
+        if (mutObserver) {
+            mutObserver.observe(document.body, { childList: true, subtree: true });
+        }
         setInterval(() => {
             scanForTrackImages();
             pruneDeadDiscs();

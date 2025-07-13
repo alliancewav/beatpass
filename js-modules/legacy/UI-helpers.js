@@ -6,107 +6,52 @@
     let isProcessing = false;
     let currentPath = null;
     let processingTimeout = null;
-    let debounceTimeout = null;
-    let lastProcessTime = 0;
     
     // Add CSS animations for smooth transitions
     function addSubtitleAnimationStyles() {
         if (document.getElementById('subtitle-animation-styles')) return;
         
-        // Use UIHelpersInitManager for CSS injection if available, otherwise fallback
-        if (window.UIHelpersInitManager && window.UIHelpersInitManager.styleManager) {
-            window.UIHelpersInitManager.styleManager.injectSubtitleAnimationStyles();
-        } else {
-            const style = document.createElement('style');
-            style.id = 'subtitle-animation-styles';
-            style.textContent = `
-                .subtitle-fade-in {
+        const style = document.createElement('style');
+        style.id = 'subtitle-animation-styles';
+        style.textContent = `
+            .subtitle-fade-in {
+                opacity: 0;
+                transform: translateY(-10px);
+                animation: subtitleFadeIn 0.4s ease-out forwards;
+            }
+            
+            @keyframes subtitleFadeIn {
+                from {
                     opacity: 0;
                     transform: translateY(-10px);
-                    animation: subtitleFadeIn 0.4s ease-out forwards;
                 }
-                
-                .subtitle-fade-out {
+                to {
                     opacity: 1;
                     transform: translateY(0);
-                    animation: subtitleFadeOut 0.15s ease-in forwards;
                 }
-                
-                @keyframes subtitleFadeIn {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-8px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-                
-                @keyframes subtitleFadeOut {
-                    from {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                    to {
-                        opacity: 0;
-                        transform: translateY(-3px);
-                    }
-                }
-                
-                .subtitle-element {
-                    transition: opacity 0.3s ease, transform 0.3s ease;
-                }
-            `;
-            document.head.appendChild(style);
-        }
+            }
+            
+            .subtitle-element {
+                transition: opacity 0.3s ease, transform 0.3s ease;
+            }
+        `;
+        document.head.appendChild(style);
     }
     function normalizePath(path) {
         return path.replace(/\/$/, "");
     }
 
-    // Centralized subtitle manager with enhanced SPA support and debouncing
-    function manageSubtitles(forceUpdate = false) {
+    // Centralized subtitle manager
+    function manageSubtitles() {
         const path = normalizePath(window.location.pathname);
-        const now = Date.now();
         
-        // Aggressive throttling to prevent performance issues
-        const THROTTLE_DURATION = 1000; // Increased from 300ms to 1000ms
-        
-        // Debounce rapid calls to prevent double subtitles
-        if (debounceTimeout) {
-            clearTimeout(debounceTimeout);
-        }
-        
-        // If we just processed recently, throttle aggressively unless forced
-        if (!forceUpdate && (now - lastProcessTime) < THROTTLE_DURATION) {
-            // Only allow one debounced call to prevent accumulation
-            if (!debounceTimeout) {
-                debounceTimeout = setTimeout(() => {
-                    debounceTimeout = null;
-                    manageSubtitles(true);
-                }, THROTTLE_DURATION - (now - lastProcessTime));
-            }
+        // Prevent duplicate processing
+        if (isProcessing || currentPath === path) {
             return;
-        }
-        
-        // Prevent duplicate processing for same path unless forced
-        if (!forceUpdate && (isProcessing || currentPath === path)) {
-            return;
-        }
-        
-        // Reset processing state for new navigation
-        if (currentPath !== path) {
-            isProcessing = false;
-            if (processingTimeout) {
-                clearTimeout(processingTimeout);
-                processingTimeout = null;
-            }
         }
         
         isProcessing = true;
         currentPath = path;
-        lastProcessTime = now;
         
         // Clear any existing timeout
         if (processingTimeout) {
@@ -115,68 +60,45 @@
         
         processingTimeout = setTimeout(() => {
             try {
-                console.log('Managing subtitles for path:', path);
-                 
-                 // Immediately remove any existing subtitles to prevent duplicates
-                 const allSubtitleSelector = "h2[data-latestfeed-subtitle='true'], " +
-                                           "h2[data-beatpacks-subtitle='true'], " +
-                                           "h2[data-producers-subtitle='true'], " +
-                                           "h2[data-trending-subtitle='true'], " +
-                                           "h2[data-genre-channel-subtitle='true'], " +
-                                           "h2[data-pricing-subtitle='true'], " +
-                                           "h2[data-genre-subtitle='true'], " +
-                                           "p[data-static-subtitle='true'], " +
-                                           "p[data-genre-subtitle='true']";
-                 
-                 const existingSubtitles = document.querySelectorAll(allSubtitleSelector);
-                 
-                 // Immediately remove existing subtitles without animation to prevent visual glitches
-                 existingSubtitles.forEach(el => {
-                     if (el.parentNode) {
-                         el.remove();
-                     }
-                 });
+                // Remove any existing subtitles immediately (no animation to prevent flicker)
+                // But don't remove genre-specific subtitles if we're on a genre page
+                let selector = "h2[data-latestfeed-subtitle='true'], " +
+                               "h2[data-beatpacks-subtitle='true'], " +
+                               "h2[data-producers-subtitle='true'], " +
+                               "h2[data-trending-subtitle='true'], " +
+                               "h2[data-genre-channel-subtitle='true'], " +
+                               "h2[data-pricing-subtitle='true'], " +
+                               "p[data-static-subtitle='true']";
                 
-                // Small delay to ensure DOM is clean before adding new subtitles
-                 setTimeout(() => {
-                    try {
-                        // First, try to add genre subtitle if this is a genre page
-                        let genreSubtitleAdded = false;
-                        if (isGenrePage()) {
-                            genreSubtitleAdded = addGenreSubtitle();
-                            console.log('Genre subtitle attempt result:', genreSubtitleAdded);
-                        }
-                        
-                        // Add H1-based subtitle only if no genre subtitle was added
-                        let mainSubtitleAdded = false;
-                        if (!genreSubtitleAdded) {
-                            console.log('Adding H1-based subtitle for path:', path);
-                            mainSubtitleAdded = addSubtitleForPath(path);
-                        } else {
-                            mainSubtitleAdded = true;
-                        }
-                        
-                        // Only add section-based subtitles if no main subtitle was added
-                        // This prevents double subtitles on pages with both main and section content
-                        if (!mainSubtitleAdded) {
-                            console.log('Processing section-based subtitles');
-                            addSectionBasedSubtitles();
-                        } else {
-                            console.log('Skipping section-based subtitles - main subtitle already added');
-                        }
-                        
-                    } catch (innerError) {
-                         console.error('Inner subtitle processing error:', innerError);
-                     }
-                 }, 50); // Reduced delay to prevent visual gaps
+                // Only remove genre subtitles if we're not on a genre page
+                if (!isGenrePage()) {
+                    selector = "h2[data-genre-subtitle='true'], " + selector + ", p[data-genre-subtitle='true']";
+                }
+                
+                const existingSubtitles = document.querySelectorAll(selector);
+                existingSubtitles.forEach(el => el.remove());
+                
+                // First, try to add genre subtitle if this is a genre page
+                let genreSubtitleAdded = false;
+                if (isGenrePage()) {
+                    genreSubtitleAdded = addGenreSubtitle();
+                    console.log('Genre subtitle attempt result:', genreSubtitleAdded);
+                }
+                
+                // Add H1-based subtitle only if no genre subtitle was added
+                if (!genreSubtitleAdded) {
+                    console.log('Adding H1-based subtitle for path:', path);
+                    addSubtitleForPath(path);
+                }
+                
+                // Always try to add section-based subtitles
+                console.log('Processing section-based subtitles');
+                addSectionBasedSubtitles();
                 
             } catch (error) {
                 console.error('Subtitle management error:', error);
             } finally {
-                // Reset processing state after a delay to allow for retries
-                setTimeout(() => {
-                    isProcessing = false;
-                }, 200);
+                isProcessing = false;
             }
         }, 100);
     }
@@ -196,8 +118,9 @@
                 subtitleText = "Discover the latest beats, fresh and ready to inspire your next project.";
                 dataAttribute = "data-latestfeed-subtitle";
             } else {
-                // For home page without recognizable H1, don't add main subtitle
-                return false;
+                // Fallback to section-based detection
+                addSectionBasedSubtitles();
+                return true;
             }
         } else if (path === "/genres" || path === "/channel/genres") {
             subtitleText = "Explore beats for every mood and style to inspire your sound.";
@@ -228,19 +151,13 @@
             subtitleText = "Meet the talented producers shaping unique sounds and vibes.";
             dataAttribute = "data-genre-channel-subtitle";
         } else {
-            // For unknown paths, don't add main subtitle - let section-based detection handle it
-            return false;
+            // Try section-based detection for other pages
+            addSectionBasedSubtitles();
+            return true;
         }
         
-        // Create and insert subtitle with duplicate prevention
+        // Create and insert subtitle
         if (subtitleText) {
-            // Double-check that no subtitle with this data attribute already exists
-            const existingSubtitle = document.querySelector(`[${dataAttribute}='true']`);
-            if (existingSubtitle) {
-                console.log('Subtitle already exists, skipping creation:', dataAttribute);
-                return true;
-            }
-            
             const subtitle = document.createElement("h2");
             subtitle.setAttribute(dataAttribute, "true");
             subtitle.className = "text-base text-muted mb-4 subtitle-element subtitle-fade-in";
@@ -388,260 +305,59 @@
 
     // Section 2: Simplified Static Subtitles - handled by centralized manager
 
-        // Improved initialization system
+        // Simplified initialization system
     function initSubtitles() {
         // Add animation styles
         addSubtitleAnimationStyles();
         
-        // Enhanced function to check if page is ready for subtitles (more lenient for SPA)
-        function isPageReady() {
-            const h1 = document.querySelector('h1.text-3xl');
-            const main = document.querySelector('main');
-            const hasContent = document.querySelector('.dashboard-grid-main, [role="main"], main > div, .container, .content');
-            
-            // For SPA, we're more lenient - just need basic elements
-            const basicReady = h1 && main;
-            
-            // For SPA navigation, don't be too strict about readyState
-            const readyStateOk = document.readyState !== 'loading';
-            
-            return basicReady && readyStateOk;
-        }
-        
-        // Use UIHelpersInitManager if available, otherwise fallback to original logic
-        if (window.UIHelpersInitManager && !window.UIHelpersInitManager.isInitialized()) {
-            window.UIHelpersInitManager.init();
-        } else if (!window.UIHelpersInitManager) {
-            // Function to attempt subtitle management
-            function attemptSubtitles() {
-                if (isPageReady()) {
-                    manageSubtitles();
-                    return true;
-                }
-                return false;
-            }
-            
-            // Enhanced retry system for first page load
-            let retryCount = 0;
-            const maxRetries = 15;
-            
-            function retryWithBackoff() {
-                if (retryCount >= maxRetries) return;
-                
-                if (attemptSubtitles()) {
-                    console.log('Subtitles loaded successfully after', retryCount, 'retries');
-                    return;
-                }
-                
-                retryCount++;
-                // Progressive backoff: 50ms, 100ms, 200ms, 400ms, 800ms, then 1000ms
-                const delay = retryCount <= 5 ? Math.min(50 * Math.pow(2, retryCount - 1), 800) : 1000;
-                
-                setTimeout(retryWithBackoff, delay);
-            }
-            
-            // Try immediately, then use backoff retry
-            if (!attemptSubtitles()) {
-                retryWithBackoff();
-            }
-        }
-        
-        // Use UIHelpersInitManager for mutation observation if available, otherwise fallback
-        if (!window.UIHelpersInitManager) {
-            // Enhanced mutation observer for better SPA support
-            let mutationDebounceTimeout = null;
-            const observer = new MutationObserver((mutations) => {
-                let shouldUpdate = false;
-                let hasSignificantChange = false;
-                
-                mutations.forEach(mutation => {
-                    if (mutation.type === 'childList') {
-                        const target = mutation.target;
-                        
-                        // Check for significant DOM changes that indicate navigation
-                        if (target.matches && (
-                            target.matches('main') ||
-                            target.closest('main') ||
-                            target.matches('.dashboard-grid-main') ||
-                            target.closest('.dashboard-grid-main') ||
-                            target.matches('body') ||
-                            target.matches('[data-page]') ||
-                            target.closest('[data-page]')
-                        )) {
-                            shouldUpdate = true;
-                            
-                            // Check if h1 was added (not just any change)
-                            if (Array.from(mutation.addedNodes).some(node => 
-                                node.nodeType === 1 && (
-                                    node.matches('h1.text-3xl') ||
-                                    node.querySelector('h1.text-3xl')
-                                )
-                            )) {
-                                hasSignificantChange = true;
-                            }
-                        }
-                        
-                        // Only watch for h1 additions, not all changes
-                        if (Array.from(mutation.addedNodes).some(node => 
-                            node.nodeType === 1 && (
-                                node.matches('h1.text-3xl') ||
-                                node.querySelector('h1.text-3xl')
-                            )
-                        )) {
-                            shouldUpdate = true;
-                            hasSignificantChange = true;
-                        }
-                    }
-                });
-                
-                if (shouldUpdate) {
-                    // Use separate debounce for mutation observer to prevent conflicts
-                    if (mutationDebounceTimeout) {
-                        clearTimeout(mutationDebounceTimeout);
-                    }
-                    mutationDebounceTimeout = setTimeout(() => {
-                        manageSubtitles(hasSignificantChange);
-                    }, hasSignificantChange ? 500 : 800); // Increased delays to reduce frequency
-                }
-            });
-            
-            // Start observing
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-        }
-        
-        // Use UIHelpersInitManager for navigation handling if available, otherwise fallback
-        if (!window.UIHelpersInitManager) {
-            // Enhanced navigation detection for SPA
-            const originalPushState = history.pushState;
-            const originalReplaceState = history.replaceState;
-            
-            function handleNavigation(eventType) {
-                console.log('Navigation detected:', eventType, window.location.pathname);
+        // Set up simple navigation detection
+        ["pushState", "replaceState"].forEach(method => {
+            const orig = history[method];
+            history[method] = function(...args) {
+                const res = orig.apply(this, args);
                 // Reset state on navigation
                 isProcessing = false;
                 currentPath = null;
-                if (processingTimeout) {
-                    clearTimeout(processingTimeout);
-                    processingTimeout = null;
-                }
-                
-                // Clear any existing debounce to prioritize navigation events
-                if (debounceTimeout) {
-                    clearTimeout(debounceTimeout);
-                }
-                
-                // Single attempt with debouncing for SPA navigation
-                debounceTimeout = setTimeout(() => manageSubtitles(true), 250);
+                setTimeout(() => {
+                    manageSubtitles(); // Handle all subtitle types
+                }, 150);
+                return res;
+            };
+        });
+        
+        window.addEventListener("popstate", () => {
+            // Reset state on navigation
+            isProcessing = false;
+            currentPath = null;
+            setTimeout(() => {
+                manageSubtitles(); // Handle all subtitle types
+            }, 150);
+        });
+        
+        // Initial load - try multiple times with increasing delays to ensure success
+        const tryInitialLoad = () => {
+            const h1Exists = document.querySelector("h1.text-3xl");
+            if (h1Exists) {
+                manageSubtitles(); // This now handles both genre and regular subtitles
+                return true;
             }
-            
-            history.pushState = function(...args) {
-                const res = originalPushState.apply(this, args);
-                handleNavigation('pushState');
-                return res;
-            };
-            
-            history.replaceState = function(...args) {
-                const res = originalReplaceState.apply(this, args);
-                handleNavigation('replaceState');
-                return res;
-            };
-            
-            // Handle back/forward navigation
-            window.addEventListener('popstate', () => {
-                handleNavigation('popstate');
-            });
-            
-            // Additional event listeners for common SPA frameworks
-            window.addEventListener('hashchange', () => {
-                handleNavigation('hashchange');
-            });
-            
-            // Listen for custom navigation events that SPAs might dispatch
-            window.addEventListener('routechange', () => {
-                handleNavigation('routechange');
-            });
-            
-            window.addEventListener('navigationend', () => {
-                handleNavigation('navigationend');
-            });
-        }
+            return false;
+        };
         
-        // Use UIHelpersInitManager for periodic checks if available, otherwise fallback
-        if (!window.UIHelpersInitManager) {
-            // Minimal periodic check as a fallback for SPA navigation
-            let lastKnownPath = window.location.pathname;
-            let lastKnownH1Text = '';
-            let lastSubtitleUpdateTime = 0;
-            
-            setInterval(() => {
-                const currentPagePath = window.location.pathname;
-                const h1 = document.querySelector('h1.text-3xl');
-                const currentH1Text = h1 ? h1.textContent.trim() : '';
-                const now = Date.now();
-                
-                // Only trigger on path changes (ignore H1 changes to reduce noise)
-                const pathChanged = currentPagePath !== lastKnownPath;
-                
-                // Much more aggressive throttling - only allow updates if significant time has passed
-                const timeSinceLastUpdate = now - lastSubtitleUpdateTime;
-                const shouldUpdate = pathChanged && timeSinceLastUpdate > 3000; // Increased from 2000ms to 3000ms
-                
-                if (shouldUpdate) {
-                    console.log('Periodic check detected path change:', {
-                        oldPath: lastKnownPath,
-                        newPath: currentPagePath,
-                        timeSinceLastUpdate: timeSinceLastUpdate
-                    });
-                    
-                    lastKnownPath = currentPagePath;
-                    lastKnownH1Text = currentH1Text;
-                    lastSubtitleUpdateTime = now;
-                    
-                    // Reset state and debounced update
-                    isProcessing = false;
-                    currentPath = null;
-                    
-                    // Clear existing debounce and set new one
-                    if (debounceTimeout) {
-                        clearTimeout(debounceTimeout);
-                    }
-                    debounceTimeout = setTimeout(() => manageSubtitles(true), 300);
-                } else if (pathChanged) {
-                    // Update tracking variables even if we don't process
-                    lastKnownPath = currentPagePath;
-                    lastKnownH1Text = currentH1Text;
+        // Try immediately
+        if (!tryInitialLoad()) {
+            // Try after 200ms
+            setTimeout(() => {
+                if (!tryInitialLoad()) {
+                    // Try after 500ms
+                    setTimeout(() => {
+                        if (!tryInitialLoad()) {
+                            // Final try after 1000ms
+                            setTimeout(tryInitialLoad, 1000);
+                        }
+                    }, 500);
                 }
-            }, 2500); // Reduced frequency from 1500ms to 2500ms
-        }
-        
-        // Use UIHelpersInitManager for load events if available, otherwise fallback
-        if (!window.UIHelpersInitManager) {
-            // Enhanced window load event handling
-            window.addEventListener('load', () => {
-                // Reset retry count on window load
-                retryCount = 0;
-                setTimeout(() => {
-                    if (!attemptSubtitles()) {
-                        // If still failing after window load, try more aggressively
-                        setTimeout(() => manageSubtitles(), 200);
-                        setTimeout(() => manageSubtitles(), 500);
-                    }
-                }, 100);
-            });
-        }
-        
-        // Additional trigger for DOMContentLoaded if we missed it
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                setTimeout(() => {
-                    if (!attemptSubtitles()) {
-                        retryWithBackoff();
-                    }
-                }, 50);
-            });
+            }, 200);
         }
     }
 

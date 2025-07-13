@@ -3,112 +3,24 @@
 // ============================================================
 // Style Injection: Hide the exclusive license popup button
 // ============================================================
-if (window.BeatPassIntegrationInitManager && window.BeatPassIntegrationInitManager.styleManager) {
-    window.BeatPassIntegrationInitManager.styleManager.injectFloatingButtonHide();
-} else {
-    // Fallback to direct CSS injection for backward compatibility
-    const licenseStyle = document.createElement('style');
-    licenseStyle.textContent = `
-    /* Hide the exclusive license popup button container completely so it never flashes */
-    .FloatingButton__FloatingButtonContainer-sc-q5md4t-0.gQsXAb {
-        display: none !important;
-    }
-    `;
-    document.head.appendChild(licenseStyle);
+const licenseStyle = document.createElement('style');
+licenseStyle.textContent = `
+/* Hide the exclusive license popup button container completely so it never flashes */
+.FloatingButton__FloatingButtonContainer-sc-q5md4t-0.gQsXAb {
+    display: none !important;
 }
+`;
+document.head.appendChild(licenseStyle);
 
 // ============================================================
-// Enhanced Helper: Load external scripts dynamically with caching
+// Helper: Load external scripts dynamically
 // ============================================================
-// Enhanced global state
-let isInitialized = false;
-let currentPath = null;
-let initTimeout = null;
-let observer = null;
-let loadedScripts = new Set();
-let scriptLoadPromises = new Map();
-
-// Enhanced configuration
-const CONFIG = {
-    DEBOUNCE_DELAY: 300,
-    OBSERVER_THROTTLE: 100,
-    SCRIPT_LOAD_TIMEOUT: 10000,
-    RETRY_ATTEMPTS: 3,
-    RETRY_DELAY: 1000,
-    CACHE_DURATION: 300000, // 5 minutes
-    PERFORMANCE_BUDGET: 16 // 16ms per frame
-};
-
-// Performance monitoring
-const performanceMetrics = {
-    scriptLoads: 0,
-    domOperations: 0,
-    lastFrameTime: 0
-};
-
-// Optimized frame scheduler
-function scheduleWork(callback, priority = 'normal') {
-    const now = performance.now();
-    const timeSinceLastFrame = now - performanceMetrics.lastFrameTime;
-    
-    if (timeSinceLastFrame < CONFIG.PERFORMANCE_BUDGET && priority === 'low') {
-        // Defer low priority work
-        if (window.requestIdleCallback) {
-            requestIdleCallback(callback, { timeout: 1000 });
-        } else {
-            setTimeout(callback, 0);
-        }
-    } else {
-        requestAnimationFrame(() => {
-            performanceMetrics.lastFrameTime = performance.now();
-            callback();
-        });
-    }
-}
-
-// Enhanced script loader with caching and error handling
-function loadScript(src, { async = false, defer = false, cache = true } = {}) {
-    // Return existing promise if script is already loading
-    if (scriptLoadPromises.has(src)) {
-        return scriptLoadPromises.get(src);
-    }
-    
-    // Return resolved promise if script is already loaded
-    if (cache && loadedScripts.has(src)) {
-        return Promise.resolve();
-    }
-    
-    const promise = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = src;
-        if (async) s.async = true;
-        if (defer) s.defer = true;
-        
-        s.onload = () => {
-            if (cache) loadedScripts.add(src);
-            performanceMetrics.scriptLoads++;
-            scriptLoadPromises.delete(src);
-            resolve();
-        };
-        
-        s.onerror = () => {
-            scriptLoadPromises.delete(src);
-            reject(new Error(`Failed to load script: ${src}`));
-        };
-        
-        // Timeout handling
-        setTimeout(() => {
-            if (scriptLoadPromises.has(src)) {
-                scriptLoadPromises.delete(src);
-                reject(new Error(`Script load timeout: ${src}`));
-            }
-        }, CONFIG.SCRIPT_LOAD_TIMEOUT);
-        
-        document.head.appendChild(s);
-    });
-    
-    scriptLoadPromises.set(src, promise);
-    return promise;
+function loadScript(src, { async = false, defer = false } = {}) {
+    const s = document.createElement('script');
+    s.src = src;
+    if (async) s.async = true;
+    if (defer) s.defer = true;
+    document.head.appendChild(s);
 }
 
 // ============================================================
@@ -131,27 +43,9 @@ loadScript('https://cdn.webpushr.com/sw-server.min.js', { async: true });
     fjs.parentNode.appendChild(js);
 }(window, document, 'script', 'webpushr-jssdk'));
 
-// Setup webpushr only after it's loaded
-if (typeof webpushr === 'function') {
-    webpushr('setup', {
-        'key': 'BD9-HZVHJNOvIguBIG12bVGG7HBER_j11kXu84ymCs9CUXla9KdJxXLOzq_c2uv9YfqYdE6NP9_-GWxQ_U8qFY4'
-    });
-} else {
-    // Wait for webpushr to load
-    const checkWebpushr = setInterval(() => {
-        if (typeof webpushr === 'function') {
-            clearInterval(checkWebpushr);
-            webpushr('setup', {
-                'key': 'BD9-HZVHJNOvIguBIG12bVGG7HBER_j11kXu84ymCs9CUXla9KdJxXLOzq_c2uv9YfqYdE6NP9_-GWxQ_U8qFY4'
-            });
-        }
-    }, 100);
-    
-    // Clear interval after 10 seconds to prevent infinite checking
-    setTimeout(() => {
-        clearInterval(checkWebpushr);
-    }, 10000);
-}
+webpushr('setup', {
+    'key': 'BD9-HZVHJNOvIguBIG12bVGG7HBER_j11kXu84ymCs9CUXla9KdJxXLOzq_c2uv9YfqYdE6NP9_-GWxQ_U8qFY4'
+});
 
 // Studio booking and license widgets (Elfsight)
 loadScript('https://static.elfsight.com/platform/platform.js', { async: true });
@@ -159,25 +53,11 @@ loadScript('https://static.elfsight.com/platform/platform.js', { async: true });
 // <div class="elfsight-app-ab4dcb23-6b3c-470b-a8d2-4b613fd231e1" data-elfsight-app-lazy></div>
 // <div class="elfsight-app-291ac0e2-5475-4e52-9672-73ff73c21b78" data-elfsight-app-lazy></div>
 
-// OpenWidget: communication tool - Enhanced initialization
-// Ensure __ow object is properly initialized to prevent undefined errors
-window.__ow = {
-    organizationId: "b3302ecd-2723-4154-95ee-1468ed9f1e4a",
-    integration_name: "manual_settings",
-    product_name: "openwidget",
-    asyncInit: false
-};
-
-// Additional safety check
-if (typeof window.__ow !== 'object' || window.__ow === null) {
-    console.warn('[OpenWidget] Failed to initialize __ow object, creating fallback');
-    window.__ow = {
-        organizationId: "b3302ecd-2723-4154-95ee-1468ed9f1e4a",
-        integration_name: "manual_settings",
-        product_name: "openwidget",
-        asyncInit: false
-    };
-}
+// OpenWidget: communication tool
+window.__ow = window.__ow || {};
+window.__ow.organizationId = "b3302ecd-2723-4154-95ee-1468ed9f1e4a";
+window.__ow.integration_name = "manual_settings";
+window.__ow.product_name = "openwidget";
 (function(n, t, c) {
     function i(n) {
         return e._h ? e._h.apply(null, n) : e._q.push(n);
@@ -222,98 +102,30 @@ function logDebug(...args) {
     if (DEBUG) console.log(...args);
 }
 
-// ============================================================
-// Enhanced Helper: Check if device is desktop with caching
-// ============================================================
-let deviceTypeCache = null;
-let lastResizeTime = 0;
-
 function isDesktop() {
-    const now = Date.now();
-    if (deviceTypeCache !== null && now - lastResizeTime < 1000) {
-        return deviceTypeCache;
-    }
-    
-    deviceTypeCache = window.matchMedia("(min-width: 1024px)").matches;
-    lastResizeTime = now;
-    return deviceTypeCache;
+    return window.matchMedia("(min-width: 1024px)").matches;
 }
 
-// Update cache on resize
-window.addEventListener('resize', debounce(() => {
-    deviceTypeCache = null;
-}, 250));
-
-// ============================================================
-// Enhanced Helper: Wait for element with better performance
-// ============================================================
-function waitForElement(selector, timeout = 5000, root = document.body) {
-    return new Promise((resolve, reject) => {
-        // Quick check first
-        const element = root.querySelector(selector);
-        if (element) {
-            resolve(element);
-            return;
-        }
-
-        let observer;
-        const timeoutId = setTimeout(() => {
-            if (observer) observer.disconnect();
-            reject(new Error(`Element ${selector} not found within ${timeout}ms`));
-        }, timeout);
-
-        observer = new MutationObserver((mutations) => {
-            // Batch check for better performance
-            for (const mutation of mutations) {
-                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                    const element = root.querySelector(selector);
-                    if (element) {
-                        clearTimeout(timeoutId);
-                        observer.disconnect();
-                        resolve(element);
-                        return;
-                    }
-                }
+function waitForElement(selector) {
+    return new Promise(resolve => {
+        const existing = document.querySelector(selector);
+        if (existing) return resolve(existing);
+        const observer = new MutationObserver(() => {
+            const found = document.querySelector(selector);
+            if (found) {
+                observer.disconnect();
+                resolve(found);
             }
         });
-
-        observer.observe(root, {
-            childList: true,
-            subtree: true
-        });
+        observer.observe(document.body, { childList: true, subtree: true });
     });
 }
 
-// ============================================================
-// Enhanced Helper: Debounce with immediate option
-// ============================================================
-function debounce(func, wait, immediate = false) {
+function debounce(func, wait) {
     let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            timeout = null;
-            if (!immediate) func.apply(this, args);
-        };
-        
-        const callNow = immediate && !timeout;
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-        
-        if (callNow) func.apply(this, args);
-    };
-}
-
-// ============================================================
-// Enhanced Helper: Throttle function
-// ============================================================
-function throttle(func, limit) {
-    let inThrottle;
     return function(...args) {
-        if (!inThrottle) {
-            func.apply(this, args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
     };
 }
 
@@ -325,140 +137,62 @@ document.addEventListener("DOMContentLoaded", function() {
     const trackPagePattern = /^https:\/\/open\.beatpass\.ca\/track\//;
 
     function replaceMicrophoneIcons() {
-        const selectors = [
-            'button[aria-label="Lyrics"] svg',
-            'div.h-auto.mb-24 svg[data-testid="MediaMicrophoneIcon"]',
-            'svg[data-testid="microphone-icon"]',
-            '.microphone-icon',
-            '[class*="microphone"]'
-        ];
-        
-        scheduleWork(() => {
-            const visible = el => el && el.offsetParent !== null;
-            
-            selectors.forEach(selector => {
-                const elements = document.querySelectorAll(selector);
-                
-                elements.forEach(element => {
-                    if (element.dataset.replaced) return;
-                    
-                    try {
-                        if (selector.includes('button[aria-label="Lyrics"]')) {
-                            const micButton = element.closest('button');
-                            if (micButton && visible(micButton)) {
-                                element.remove();
-                                micButton.innerHTML = '<i class="fa fa-copyright"></i>';
-                                micButton.dataset.replaced = 'true';
-                            }
-                        } else if (visible(element)) {
-                            const parent = element.parentElement;
-                            if (parent) {
-                                element.remove();
-                                const rep = document.createElement('i');
-                                rep.classList.add('fa', 'fa-copyright');
-                                parent.appendChild(rep);
-                                rep.dataset.replaced = 'true';
-                            }
-                        }
-                        performanceMetrics.domOperations++;
-                    } catch (error) {
-                        console.warn('Error replacing microphone icon:', error);
-                    }
-                });
-            });
-        }, 'low');
+        const micButton = document.querySelector('button[aria-label="Lyrics"]');
+        const secondIcon = document.querySelector('div.h-auto.mb-24 svg[data-testid="MediaMicrophoneIcon"]');
+        const visible = el => el && el.offsetParent !== null;
+        if (micButton && visible(micButton)) {
+            const svg = micButton.querySelector('svg');
+            if (svg) {
+                svg.remove();
+                micButton.innerHTML = '<i class="fa fa-copyright"></i>';
+            }
+        }
+        if (secondIcon && visible(secondIcon)) {
+            const parent = secondIcon.parentElement;
+            if (parent) {
+                secondIcon.remove();
+                const rep = document.createElement('i');
+                rep.classList.add('fa', 'fa-copyright');
+                parent.appendChild(rep);
+            }
+        }
     }
 
     function addBuyButton() {
         if (!trackPagePattern.test(window.location.href)) return;
-        
-        scheduleWork(() => {
-            try {
-                const more = document.querySelector('button svg[data-testid="MoreHorizOutlinedIcon"]');
-                if (!more || document.querySelector('#buy-exclusively-btn')) return;
-                
-                const moreButton = more.closest('button');
-                if (!moreButton) return;
-                
-                const btn = document.createElement("button");
-                btn.type = "button";
-                btn.id = "buy-exclusively-btn";
-                btn.className = moreButton.className + " buy-exclusively-btn";
-                btn.setAttribute('aria-label', 'Request License');
-                btn.innerHTML = `
-                    <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"
-                         viewBox="0 0 24 24" width="24" height="24">
-                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H8v-2h4v2zm4-4H8v-2h8v2zm0-4H8V7h8v2z"/>
-                    </svg>
-                    Request License
-                `;
-                
-                btn.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    triggerLicensePurchaseForm();
-                });
-                
-                // Add with fade-in animation
-                btn.style.opacity = '0';
-                btn.style.transform = 'scale(0.95)';
-                btn.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-                
-                moreButton.parentNode.insertBefore(btn, moreButton.nextSibling);
-                
-                // Animate in
-                requestAnimationFrame(() => {
-                    btn.style.opacity = '1';
-                    btn.style.transform = 'scale(1)';
-                });
-                
-                performanceMetrics.domOperations++;
-            } catch (error) {
-                console.warn('Error adding buy button:', error);
-            }
-        }, 'normal');
+        const more = document.querySelector('button svg[data-testid="MoreHorizOutlinedIcon"]');
+        if (more && !document.querySelector('#buy-exclusively-btn')) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.id = "buy-exclusively-btn";
+            btn.className = more.closest('button').className + " buy-exclusively-btn";
+            btn.innerHTML = `
+<svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"
+viewBox="0 0 24 24" width="24" height="24">
+<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H8v-2h4v2zm4-4H8v-2h8v2zm0-4H8V7h8v2z"/>
+</svg>
+Request License
+`;
+            btn.addEventListener("click", triggerLicensePurchaseForm);
+            more.closest('button').parentNode.insertBefore(btn, more.closest('button').nextSibling);
+        }
     }
 
-    async function triggerLicensePurchaseForm() {
-        try {
-            const selector = '.FloatingButton__FloatingButtonContainer-sc-q5md4t-0.gQsXAb .es-forms-floating-button';
-            let licenseBtn = document.querySelector(selector);
-            
-            if (licenseBtn) {
-                licenseBtn.click();
-                return;
-            }
-            
-            // Wait for the button to appear with enhanced waiting
-            try {
-                licenseBtn = await waitForElement(selector, 10000);
-                licenseBtn.click();
-            } catch (error) {
-                console.warn('License button not found, trying fallback approach:', error);
-                
-                // Fallback: try alternative selectors
-                const fallbackSelectors = [
-                    '.es-forms-floating-button',
-                    '[class*="floating-button"]',
-                    'button[aria-label*="license" i]',
-                    'button[title*="license" i]'
-                ];
-                
-                for (const fallbackSelector of fallbackSelectors) {
-                    const fallbackBtn = document.querySelector(fallbackSelector);
-                    if (fallbackBtn) {
-                        fallbackBtn.click();
-                        return;
-                    }
+    function triggerLicensePurchaseForm() {
+        const licenseBtn = document.querySelector('.FloatingButton__FloatingButtonContainer-sc-q5md4t-0.gQsXAb .es-forms-floating-button');
+        if (licenseBtn) {
+            licenseBtn.click();
+        } else {
+            let retries = 0, max = 20;
+            const iv = setInterval(() => {
+                const retryBtn = document.querySelector('.FloatingButton__FloatingButtonContainer-sc-q5md4t-0.gQsXAb .es-forms-floating-button');
+                if (retryBtn) {
+                    retryBtn.click();
+                    clearInterval(iv);
+                } else if (retries++ >= max) {
+                    clearInterval(iv);
                 }
-                
-                // Final fallback: open license page directly
-                const trackId = window.location.pathname.split('/track/')[1]?.split('/')[0];
-                const licenseUrl = trackId ? `/license-request?track=${trackId}` : '/license-request';
-                window.open(licenseUrl, '_blank', 'noopener,noreferrer');
-            }
-        } catch (error) {
-            console.error('Error triggering license purchase form:', error);
+            }, 500);
         }
     }
 
@@ -1057,29 +791,22 @@ document.addEventListener("DOMContentLoaded", () => {
         updateArtworkPreviewDebounced();
     }
 
-    // Use BeatPassIntegrationInitManager if available for event handling
-    if (window.BeatPassIntegrationInitManager) {
-        // The manager will handle initialization and navigation events
-        console.log("[CoverArtUpdater] Using BeatPassIntegrationInitManager for event handling.");
-    } else {
-        // Fallback to direct event listeners for backward compatibility
-        window.addEventListener("load", () => {
-            console.log("[CoverArtUpdater] Window load event. Initializing updater.");
-            initCoverArtUpdater();
-        });
-        document.addEventListener("DOMContentLoaded", () => {
-            console.log("[CoverArtUpdater] DOMContentLoaded event. Initializing updater.");
-            initCoverArtUpdater();
-        });
-        window.addEventListener('popstate', () => {
-            console.log("[CoverArtUpdater] popstate detected.");
-            setTimeout(initCoverArtUpdater, 100);
-        });
-        window.addEventListener('locationchange', () => {
-            console.log("[CoverArtUpdater] locationchange detected.");
-            setTimeout(initCoverArtUpdater, 100);
-        });
-    }
+    window.addEventListener("load", () => {
+        console.log("[CoverArtUpdater] Window load event. Initializing updater.");
+        initCoverArtUpdater();
+    });
+    document.addEventListener("DOMContentLoaded", () => {
+        console.log("[CoverArtUpdater] DOMContentLoaded event. Initializing updater.");
+        initCoverArtUpdater();
+    });
+    window.addEventListener('popstate', () => {
+        console.log("[CoverArtUpdater] popstate detected.");
+        setTimeout(initCoverArtUpdater, 100);
+    });
+    window.addEventListener('locationchange', () => {
+        console.log("[CoverArtUpdater] locationchange detected.");
+        setTimeout(initCoverArtUpdater, 100);
+    });
 })();
 
 // Add save button styling function
@@ -1120,59 +847,43 @@ function styleSaveButton(button) {
         'px-18'
     );
 
-    // Use BeatPassIntegrationInitManager for CSS injection if available
-    if (window.BeatPassIntegrationInitManager && window.BeatPassIntegrationInitManager.styleManager) {
-        window.BeatPassIntegrationInitManager.styleManager.injectSaveButtonStyles();
-    } else {
-        // Fallback to direct CSS injection for backward compatibility
-        if (!document.getElementById('save-button-styles')) {
-            const style = document.createElement('style');
-            style.id = 'save-button-styles';
-            style.textContent = `
-                :root {
-                    --primary: #1a1a1a;
-                    --primary-dark: #2a2a2a;
-                    --on-primary: #ffffff;
-                    --disabled: #666666;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-    }
-}
-
-// Add BeatPassID button custom CSS if not already present
-if (window.BeatPassIntegrationInitManager && window.BeatPassIntegrationInitManager.styleManager) {
-    window.BeatPassIntegrationInitManager.styleManager.injectBeatPassIdButtonStyles();
-} else {
-    // Fallback to direct CSS injection for backward compatibility
-    if (!document.getElementById('beatpass-id-button-style')) {
+    // Add CSS variables if not already present
+    if (!document.getElementById('save-button-styles')) {
         const style = document.createElement('style');
-        style.id = 'beatpass-id-button-style';
+        style.id = 'save-button-styles';
         style.textContent = `
-            button.beatpass-id-button.ml-2.px-4.py-2.rounded-lg.text-sm.font-medium.flex.items-center.gap-2 {
-                height: 2.25rem;
-                margin: 0.4rem;
+            :root {
+                --primary: #1a1a1a;
+                --primary-dark: #2a2a2a;
+                --on-primary: #ffffff;
+                --disabled: #666666;
             }
         `;
         document.head.appendChild(style);
     }
 }
 
+// Add BeatPassID button custom CSS if not already present
+if (!document.getElementById('beatpass-id-button-style')) {
+    const style = document.createElement('style');
+    style.id = 'beatpass-id-button-style';
+    style.textContent = `
+        button.beatpass-id-button.ml-2.px-4.py-2.rounded-lg.text-sm.font-medium.flex.items-center.gap-2 {
+            height: 2.25rem;
+            margin: 0.4rem;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 // Ensure initialization if loaded after DOMContentLoaded
 if (document.readyState !== 'loading') {
-    // Use BeatPassIntegrationInitManager if available
-    if (window.BeatPassIntegrationInitManager) {
-        window.BeatPassIntegrationInitManager.init();
-    } else {
-        // Fallback to direct initialization for backward compatibility
-        try {
-            if (typeof robustInitialize === 'function') robustInitialize();
-            if (typeof initTrackPage === 'function') initTrackPage();
-            if (typeof observeTrackChanges === 'function') observeTrackChanges();
-        } catch (e) {
-            // Ignore errors if functions are not defined
-        }
+    try {
+        if (typeof robustInitialize === 'function') robustInitialize();
+        if (typeof initTrackPage === 'function') initTrackPage();
+        if (typeof observeTrackChanges === 'function') observeTrackChanges();
+    } catch (e) {
+        // Ignore errors if functions are not defined
     }
 }
 
@@ -1213,28 +924,20 @@ if (document.readyState !== 'loading') {
     } else {
         findAndRemoveChequeButton();
     }
-    // Use BeatPassIntegrationInitManager for navigation handling if available
-    if (window.BeatPassIntegrationInitManager) {
-        // The manager will handle navigation events and call our function
-        console.log('[ChequeButtonRemover] Using BeatPassIntegrationInitManager for navigation handling.');
-        // Store the function globally so the manager can call it
-        window.findAndRemoveChequeButton = findAndRemoveChequeButton;
-    } else {
-        // Fallback to direct history patching for backward compatibility
-        (function(history) {
-            const pushState = history.pushState;
-            history.pushState = function() {
-                const res = pushState.apply(history, arguments);
-                setTimeout(findAndRemoveChequeButton, 0);
-                return res;
-            };
-            const replaceState = history.replaceState;
-            history.replaceState = function() {
-                const res = replaceState.apply(history, arguments);
-                setTimeout(findAndRemoveChequeButton, 0);
-                return res;
-            };
-        })(window.history);
-        window.addEventListener('popstate', findAndRemoveChequeButton);
-    }
+    // Patch history for SPA navigation
+    (function(history) {
+        const pushState = history.pushState;
+        history.pushState = function() {
+            const res = pushState.apply(history, arguments);
+            setTimeout(findAndRemoveChequeButton, 0);
+            return res;
+        };
+        const replaceState = history.replaceState;
+        history.replaceState = function() {
+            const res = replaceState.apply(history, arguments);
+            setTimeout(findAndRemoveChequeButton, 0);
+            return res;
+        };
+    })(window.history);
+    window.addEventListener('popstate', findAndRemoveChequeButton);
 })();

@@ -10,38 +10,136 @@
         return /^\/artist\/(\d+)(\/|$)/.test(window.location.pathname);
     }
 
+    // Optimized API with caching and error handling
     const api = {
+        cache: new Map(),
+        cacheTimeout: 30000, // 30 seconds
+        
         async get(id) {
+            const cacheKey = `get_${id}`;
+            const cached = this.cache.get(cacheKey);
+            
+            if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+                return cached.data;
+            }
+            
             try {
-                const r = await fetch(`pinned_message_handler.php?artist_id=${id}`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const r = await fetch(`pinned_message_handler.php?artist_id=${encodeURIComponent(id)}`, {
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!r.ok) {
+                    throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+                }
+                
                 const j = await r.json();
-                return j.status === 'ok' ? j : {};
-            } catch {
+                const result = j.status === 'ok' ? j : {};
+                
+                // Cache successful results
+                this.cache.set(cacheKey, {
+                    data: result,
+                    timestamp: Date.now()
+                });
+                
+                return result;
+            } catch (error) {
+                console.warn('API get error:', error);
                 return {};
             }
         },
+        
         async save(id, msg, gradient, actions = []) {
-            const r = await fetch('pinned_message_handler.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ artist_id: id, message: msg, gradient, actions })
-            });
-            const j = await r.json();
-            if (j.status !== 'ok') throw new Error(j.message || 'Error saving note');
-            return j.note || { message: msg, gradient, actions };
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                
+                const r = await fetch('pinned_message_handler.php', {
+                    method: 'POST',
+                    signal: controller.signal,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        artist_id: id, 
+                        message: msg, 
+                        gradient, 
+                        actions: Array.isArray(actions) ? actions : []
+                    })
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!r.ok) {
+                    throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+                }
+                
+                const j = await r.json();
+                if (j.status !== 'ok') {
+                    throw new Error(j.message || 'Error saving note');
+                }
+                
+                // Invalidate cache for this artist
+                this.cache.delete(`get_${id}`);
+                
+                return j.note || { message: msg, gradient, actions };
+            } catch (error) {
+                console.error('API save error:', error);
+                throw error;
+            }
         },
+        
         async addNote(id, msg, gradient, actions = []) {
             return this.save(id, msg, gradient, actions);
         },
+        
         async clearTimeline(id) {
-            const r = await fetch('pinned_message_handler.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ artist_id: id, message: '', clear_timeline: true })
-            });
-            const j = await r.json();
-            if (j.status !== 'ok') throw new Error(j.message || 'Error clearing timeline');
-            return j;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const r = await fetch('pinned_message_handler.php', {
+                    method: 'POST',
+                    signal: controller.signal,
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        artist_id: id, 
+                        message: '', 
+                        clear_timeline: true 
+                    })
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!r.ok) {
+                    throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+                }
+                
+                const j = await r.json();
+                if (j.status !== 'ok') {
+                    throw new Error(j.message || 'Error clearing timeline');
+                }
+                
+                // Invalidate cache for this artist
+                this.cache.delete(`get_${id}`);
+                
+                return j;
+            } catch (error) {
+                console.error('API clearTimeline error:', error);
+                throw error;
+            }
         }
     };
     // Fix: Expose api to global scope immediately after definition
@@ -1165,6 +1263,11 @@
     // Vibrant, engaging note banner with lord-icon and gradient picker
     async function render(attempt = 0) {
         console.log('[BP] render() called, attempt', attempt);
+        
+        // Use centralized state management if available
+        const stateManager = window.BPNotesInitManager;
+        const currentState = stateManager ? stateManager.state.lastRenderState : lastPinState;
+        
         // Remove any stray containers/modals if not on artist profile page
         if (!isArtistProfilePage()) {
             const old = document.getElementById(PIN_CONTAINER_ID);
@@ -1176,7 +1279,13 @@
             // Fade out story ring if present
             const ring = document.querySelector('.bp-story-ring-wrapper');
             if (ring) fadeOutStoryRing(ring);
-            lastPinState = { id: null, msg: null, editable: null };
+            
+            // Update state
+            if (stateManager) {
+                stateManager.state.lastRenderState = { id: null, msg: null, editable: null };
+            } else {
+                lastPinState = { id: null, msg: null, editable: null };
+            }
             return;
         }
         const id = getArtistId();
@@ -1237,15 +1346,21 @@
 
         // If nothing has changed, do nothing
         if (
-            lastPinState.id === id &&
-            lastPinState.msg === msg &&
-            lastPinState.editable === editable
+            currentState.id === id &&
+            currentState.msg === msg &&
+            currentState.editable === editable
         ) {
             console.log('[BP] render() end (no change)');
             return;
         }
 
-        lastPinState = { id, msg, editable };
+        // Update state
+        const newState = { id, msg, editable };
+        if (stateManager) {
+            stateManager.state.lastRenderState = newState;
+        } else {
+            lastPinState = newState;
+        }
 
         // --- Mini Dashboard Banner for Producers (Glassmorphism, Carousel Style) ---
         // Only show for the producer owner (mini dashboard, not public)
@@ -1944,6 +2059,13 @@
 
     // Ensure #artist-pin-container is always visible and interactive
     function ensurePinBannerStyles() {
+        // CSS injection is now handled by BPNotesInitManager
+        if (window.BPNotesInitManager) {
+            // Styles are automatically injected by the manager
+            return;
+        }
+        
+        // Fallback for backward compatibility
         if (!document.getElementById('artist-pin-banner-style')) {
             const style = document.createElement('style');
             style.id = 'artist-pin-banner-style';
@@ -2959,22 +3081,45 @@
     }
 })();
 
+// Simplified initialization - delegates to BPNotesInitManager
 function bpInitAll() {
-    console.log('[BP] bpInitAll() called');
-    if (typeof render === 'function') render();
-    if (typeof robustInitialize === 'function') robustInitialize();
+    console.log('[BP] bpInitAll() called - delegating to BPNotesInitManager');
+    if (window.BPNotesInitManager) {
+        window.BPNotesInitManager.init();
+    } else {
+        console.warn('[BP] BPNotesInitManager not available, falling back to direct initialization');
+        if (typeof render === 'function') render();
+        if (typeof robustInitialize === 'function') robustInitialize();
+    }
 }
+
+// Initialization is now handled by BPNotesInitManager
+// These listeners are kept for backward compatibility
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[BP] DOMContentLoaded: initializing banner and note features');
-    bpInitAll();
+    console.log('[BP] DOMContentLoaded: delegating to BPNotesInitManager');
+    if (window.BPNotesInitManager) {
+        window.BPNotesInitManager.init();
+    } else {
+        bpInitAll();
+    }
 });
+
 window.addEventListener('load', () => {
-    console.log('[BP] window.load: initializing banner and note features');
-    bpInitAll();
+    console.log('[BP] window.load: delegating to BPNotesInitManager');
+    if (window.BPNotesInitManager) {
+        window.BPNotesInitManager.init();
+    } else {
+        bpInitAll();
+    }
 });
+
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    console.log('[BP] Immediate init: document already ready');
-    bpInitAll();
+    console.log('[BP] Immediate init: delegating to BPNotesInitManager');
+    if (window.BPNotesInitManager) {
+        window.BPNotesInitManager.init();
+    } else {
+        bpInitAll();
+    }
 }
 
 // Helper: Extract first color stop from a linear-gradient string
@@ -2985,50 +3130,54 @@ function getFirstGradientColor(gradient) {
 
 
 
-// Add the keyframes for animations if not present
-if (!document.getElementById('bp-animation-keyframes')) {
-    const style = document.createElement('style');
-    style.id = 'bp-animation-keyframes';
-    style.textContent = `
-        @keyframes bp-gradient-ring-pan { 
-            0% { background-position: 0% 50%; } 
-            100% { background-position: 100% 50%; } 
-        }
-        @keyframes fadeInUp {
-            0% {
-                opacity: 0;
-                transform: translateY(20px) scale(0.95);
+// CSS injection and library loading is now handled by BPNotesInitManager
+// Keeping this as fallback for backward compatibility
+if (!window.BPNotesInitManager) {
+    // Add the keyframes for animations if not present
+    if (!document.getElementById('bp-animation-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'bp-animation-keyframes';
+        style.textContent = `
+            @keyframes bp-gradient-ring-pan { 
+                0% { background-position: 0% 50%; } 
+                100% { background-position: 100% 50%; } 
             }
-            100% {
-                opacity: 1;
-                transform: translateY(0) scale(1);
+            @keyframes fadeInUp {
+                0% {
+                    opacity: 0;
+                    transform: translateY(20px) scale(0.95);
+                }
+                100% {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                }
             }
-        }
-        @keyframes bp-gradient-pan {
-            0% { background-position: 0% 50%; }
-            100% { background-position: 100% 50%; }
-        }
-    `;
-    document.head.appendChild(style);
+            @keyframes bp-gradient-pan {
+                0% { background-position: 0% 50%; }
+                100% { background-position: 100% 50%; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Load Quill and DOMPurify if not already loaded
+    if (!window.Quill) {
+        const quillScript = document.createElement('script');
+        quillScript.src = 'https://cdn.quilljs.com/1.3.7/quill.min.js';
+        document.head.appendChild(quillScript);
+        const quillStyle = document.createElement('link');
+        quillStyle.rel = 'stylesheet';
+        quillStyle.href = 'https://cdn.quilljs.com/1.3.7/quill.snow.css';
+        document.head.appendChild(quillStyle);
+    }
+    if (!window.DOMPurify) {
+        const purifyScript = document.createElement('script');
+        purifyScript.src = 'https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js';
+        document.head.appendChild(purifyScript);
+    }
 }
 
-// Load Quill and DOMPurify if not already loaded
-if (!window.Quill) {
-    const quillScript = document.createElement('script');
-    quillScript.src = 'https://cdn.quilljs.com/1.3.7/quill.min.js';
-    document.head.appendChild(quillScript);
-    const quillStyle = document.createElement('link');
-    quillStyle.rel = 'stylesheet';
-    quillStyle.href = 'https://cdn.quilljs.com/1.3.7/quill.snow.css';
-    document.head.appendChild(quillStyle);
-}
-if (!window.DOMPurify) {
-    const purifyScript = document.createElement('script');
-    purifyScript.src = 'https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js';
-    document.head.appendChild(purifyScript);
-}
-
-// Debounce utility
+// Debounce utility - kept for backward compatibility
 function debounceBP(fn, delay) {
     let timeout;
     return function(...args) {
@@ -3037,7 +3186,10 @@ function debounceBP(fn, delay) {
     };
 }
 
-    // Debounce window resize event to prevent console spam
-window.addEventListener('resize', debounceBP(() => {
-    if (typeof render === 'function') render();
-}, 300));
+// Resize event handling is now managed by BPNotesInitManager
+// Keeping this as fallback for backward compatibility
+if (!window.BPNotesInitManager) {
+    window.addEventListener('resize', debounceBP(() => {
+        if (typeof render === 'function') render();
+    }, 300));
+}
