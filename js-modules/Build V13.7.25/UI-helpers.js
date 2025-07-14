@@ -2,6 +2,7 @@
 // 8. Subtitle Injection for Various Pages
 // ============================================================
 (function() {
+    const DEBUG = false; // Reduced logging for performance
     // Centralized subtitle manager to prevent conflicts
     let isProcessing = false;
     let currentPath = null;
@@ -115,7 +116,7 @@
         
         processingTimeout = setTimeout(() => {
             try {
-                console.log('Managing subtitles for path:', path);
+                if (DEBUG) console.log('Managing subtitles for path:', path);
                  
                  // Immediately remove any existing subtitles to prevent duplicates
                  const allSubtitleSelector = "h2[data-latestfeed-subtitle='true'], " +
@@ -144,13 +145,13 @@
                         let genreSubtitleAdded = false;
                         if (isGenrePage()) {
                             genreSubtitleAdded = addGenreSubtitle();
-                            console.log('Genre subtitle attempt result:', genreSubtitleAdded);
+                            if (DEBUG) console.log('Genre subtitle attempt result:', genreSubtitleAdded);
                         }
                         
                         // Add H1-based subtitle only if no genre subtitle was added
                         let mainSubtitleAdded = false;
                         if (!genreSubtitleAdded) {
-                            console.log('Adding H1-based subtitle for path:', path);
+                            if (DEBUG) console.log('Adding H1-based subtitle for path:', path);
                             mainSubtitleAdded = addSubtitleForPath(path);
                         } else {
                             mainSubtitleAdded = true;
@@ -159,10 +160,10 @@
                         // Only add section-based subtitles if no main subtitle was added
                         // This prevents double subtitles on pages with both main and section content
                         if (!mainSubtitleAdded) {
-                            console.log('Processing section-based subtitles');
+                            if (DEBUG) console.log('Processing section-based subtitles');
                             addSectionBasedSubtitles();
                         } else {
-                            console.log('Skipping section-based subtitles - main subtitle already added');
+                            if (DEBUG) console.log('Skipping section-based subtitles - main subtitle already added');
                         }
                         
                     } catch (innerError) {
@@ -505,11 +506,21 @@
                 }
             });
             
-            // Start observing
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
+            // Start observing with DOM readiness check
+            function startObserving() {
+                const targetNode = document.body || document.documentElement;
+                if (!targetNode) {
+                    if (DEBUG) console.warn('[BeatPass] DOM not ready for UI helpers observer, retrying...');
+                    setTimeout(startObserving, 100);
+                    return;
+                }
+                observer.observe(targetNode, {
+                    childList: true,
+                    subtree: true
+                });
+                if (DEBUG) console.log('[BeatPass] UI helpers observer setup complete');
+            }
+            startObserving();
         }
         
         // Use UIHelpersInitManager for navigation handling if available, otherwise fallback

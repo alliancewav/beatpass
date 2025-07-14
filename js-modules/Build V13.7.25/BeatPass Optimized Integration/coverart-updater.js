@@ -52,15 +52,25 @@
                 return resolve(el);
             }
             console.log("[CoverArtUpdater] Persistently waiting for element with selector:", selector);
-            const obs = new MutationObserver(() => {
-                el = document.querySelector(selector);
-                if (el) {
-                    console.log("[CoverArtUpdater] Found element after waiting for selector:", selector);
-                    obs.disconnect();
-                    resolve(el);
+            const startObserving = () => {
+                const targetNode = document.body || document.documentElement;
+                if (!targetNode) {
+                    console.warn('[CoverArtUpdater] DOM not ready for observer, retrying...');
+                    setTimeout(startObserving, 100);
+                    return;
                 }
-            });
-            obs.observe(document.body, { childList: true, subtree: true });
+                
+                const obs = new MutationObserver(() => {
+                    el = document.querySelector(selector);
+                    if (el) {
+                        console.log("[CoverArtUpdater] Found element after waiting for selector:", selector);
+                        obs.disconnect();
+                        resolve(el);
+                    }
+                });
+                obs.observe(targetNode, { childList: true, subtree: true });
+            };
+            startObserving();
         });
     }
 
@@ -148,14 +158,24 @@
         return new Promise(resolve => {
             let el = document.querySelector(selector);
             if (el) return resolve(el);
-            const obs = new MutationObserver(() => {
-                el = document.querySelector(selector);
-                if (el) {
-                    obs.disconnect();
-                    resolve(el);
+            const startObserving = () => {
+                const targetNode = document.body || document.documentElement;
+                if (!targetNode) {
+                    console.warn('[CoverArtUpdater] DOM not ready for waitForElement observer, retrying...');
+                    setTimeout(startObserving, 100);
+                    return;
                 }
-            });
-            obs.observe(document.body, { childList: true, subtree: true });
+                
+                const obs = new MutationObserver(() => {
+                    el = document.querySelector(selector);
+                    if (el) {
+                        obs.disconnect();
+                        resolve(el);
+                    }
+                });
+                obs.observe(targetNode, { childList: true, subtree: true });
+            };
+            startObserving();
         });
     }
 
@@ -310,13 +330,23 @@
             }
         });
 
-        const obs = new MutationObserver(muts => {
-            if (muts.length > 0) {
-                console.log("[CoverArtUpdater] Mutation batch in genre container detected.");
-                updateArtworkPreviewDebounced();
+        const startObserving = () => {
+            const targetNode = document.body || document.documentElement;
+            if (!targetNode) {
+                console.warn('[CoverArtUpdater] DOM not ready for genre container observer, retrying...');
+                setTimeout(startObserving, 100);
+                return;
             }
-        });
-        obs.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+            
+            const obs = new MutationObserver(muts => {
+                if (muts.length > 0) {
+                    console.log("[CoverArtUpdater] Mutation batch in genre container detected.");
+                    updateArtworkPreviewDebounced();
+                }
+            });
+            obs.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+        };
+        startObserving();
     }
 
     async function observeGenreField() {
@@ -331,28 +361,48 @@
             return;
         }
         console.log("[CoverArtUpdater] Observing genre group for re-rendering.");
-        const obs = new MutationObserver(muts => {
-            if (muts.length > 0) {
-                console.log("[CoverArtUpdater] Mutation batch in genre group detected.");
-                attachGenreListeners();
-                updateArtworkPreviewDebounced();
+        const startObserving = () => {
+            const targetNode = document.body || document.documentElement;
+            if (!targetNode) {
+                console.warn('[CoverArtUpdater] DOM not ready for genre group observer, retrying...');
+                setTimeout(startObserving, 100);
+                return;
             }
-        });
-        obs.observe(group, { childList: true, subtree: true });
+            
+            const obs = new MutationObserver(muts => {
+                if (muts.length > 0) {
+                    console.log("[CoverArtUpdater] Mutation batch in genre group detected.");
+                    attachGenreListeners();
+                    updateArtworkPreviewDebounced();
+                }
+            });
+            obs.observe(group, { childList: true, subtree: true });
+        };
+        startObserving();
     }
 
     async function waitForGenreInputIndefinitely() {
         return new Promise(resolve => {
             let el = document.querySelector('input[name="genres"]');
             if (el) return resolve(el);
-            const obs = new MutationObserver(() => {
-                el = document.querySelector('input[name="genres"]');
-                if (el) {
-                    obs.disconnect();
-                    resolve(el);
+            const startObserving = () => {
+                const targetNode = document.body || document.documentElement;
+                if (!targetNode) {
+                    console.warn('[CoverArtUpdater] DOM not ready for genre input observer, retrying...');
+                    setTimeout(startObserving, 100);
+                    return;
                 }
-            });
-            obs.observe(document.body, { childList: true, subtree: true });
+                
+                const obs = new MutationObserver(() => {
+                    el = document.querySelector('input[name="genres"]');
+                    if (el) {
+                        obs.disconnect();
+                        resolve(el);
+                    }
+                });
+                obs.observe(targetNode, { childList: true, subtree: true });
+            };
+            startObserving();
         });
     }
 

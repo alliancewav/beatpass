@@ -30,32 +30,43 @@
                 return;
             }
 
-            const observer = new MutationObserver((mutations, obs) => {
-                // Only check mutations that actually added nodes
-                for (const mutation of mutations) {
-                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                        const element = targetNode.querySelector(selector);
-                        if (element) {
-                            obs.disconnect();
-                            resolve(element);
-                            return;
+            const startObserving = () => {
+                const observeTarget = targetNode || document.body || document.documentElement;
+                if (!observeTarget) {
+                    console.warn('[BeatPassCore] DOM not ready for waitForElement observer, retrying...');
+                    setTimeout(startObserving, 100);
+                    return;
+                }
+                
+                const observer = new MutationObserver((mutations, obs) => {
+                    // Only check mutations that actually added nodes
+                    for (const mutation of mutations) {
+                        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                            const element = observeTarget.querySelector(selector);
+                            if (element) {
+                                obs.disconnect();
+                                resolve(element);
+                                return;
+                            }
                         }
                     }
-                }
-            });
+                });
 
-            observer.observe(targetNode, { 
-                childList: true, 
-                subtree: true,
-                // Optimize by not observing attributes
-                attributes: false,
-                characterData: false
-            });
+                observer.observe(observeTarget, { 
+                    childList: true, 
+                    subtree: true,
+                    // Optimize by not observing attributes
+                    attributes: false,
+                    characterData: false
+                });
 
-            setTimeout(() => {
-                observer.disconnect();
-                reject(new Error(`Element ${selector} not found within ${timeout}ms`));
-            }, timeout);
+                setTimeout(() => {
+                    observer.disconnect();
+                    reject(new Error(`Element ${selector} not found within ${timeout}ms`));
+                }, timeout);
+            };
+            
+            startObserving();
         });
     }
 
@@ -137,7 +148,7 @@
                    document.querySelector('input[placeholder*="Name"]');
         
         const trackName = inp ? inp.value.trim() : '';
-        console.log("ðŸ·ï¸ getTrackName() found:", trackName);
+        console.log("🏷️ getTrackName() found:", trackName);
         return trackName;
     }
     
@@ -624,7 +635,7 @@
 
     // Module constants
     const MODULE_NAME = 'BeatPassMetadataValidator';
-    const DEBUG = true;
+    const DEBUG = false; // Reduced logging for performance
 
     // Validation constants
     const BPM_MIN = 40;
@@ -1055,7 +1066,7 @@
                 return;
             }
             
-            if (DEBUG) console.log(`ðŸš€ Initializing ${MODULE_NAME}`);
+            if (DEBUG) console.log(`🚀 Initializing ${MODULE_NAME}`);
             
             // Setup real-time field validation
             if (document.readyState === 'loading') {
@@ -1066,13 +1077,13 @@
             
             isInitialized = true;
             
-            if (DEBUG) console.log(`âœ… ${MODULE_NAME} initialized successfully`);
+            if (DEBUG) console.log(`✅ ${MODULE_NAME} initialized successfully`);
         },
         
         // Cleanup
         destroy() {
             isInitialized = false;
-            if (DEBUG) console.log(`ðŸ§¹ ${MODULE_NAME} destroyed`);
+            if (DEBUG) console.log(`🧹 ${MODULE_NAME} destroyed`);
         }
     };
 
@@ -1095,6 +1106,6 @@
         MetadataValidator.init();
     }
 
-    if (DEBUG) console.log(`ðŸ“¦ ${MODULE_NAME} module loaded`);
+    if (DEBUG) console.log(`📦 ${MODULE_NAME} module loaded`);
 
 })();

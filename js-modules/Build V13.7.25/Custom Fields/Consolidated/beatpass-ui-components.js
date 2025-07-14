@@ -4,13 +4,20 @@
 (function() {
     'use strict';
     
-    console.log('ðŸŽ¨ Custom Field Creator module loaded');
+    const DEBUG = false; // Reduced logging for performance
+    
+    if (DEBUG) console.log('🎨 Custom Field Creator module loaded');
     
     // ---------------------------
     // Custom Field Creation Functions
     // ---------------------------
     
     function createDropdownField(labelText, id, placeholder, options, defaultValue = '', valueMap = {}) {
+        // Correct garbled characters in options if they are the default music keys
+        if (JSON.stringify(options) === JSON.stringify(['C', 'C# / D♭', 'D', 'D# / E♭', 'E', 'F', 'F# / G♭', 'G', 'G# / A♭', 'A', 'A# / B♭', 'B'])) {
+            options = ['C', 'C# / D♭', 'D', 'D# / E♭', 'E', 'F', 'F# / G♭', 'G', 'G# / A♭', 'A', 'A# / B♭', 'B'];
+        }
+
         const wrapper = document.createElement('div');
         wrapper.className = 'mb-24 text-sm';
         const label = document.createElement('label');
@@ -181,7 +188,7 @@
         return wrapper;
     }
     
-    // Helper to map label â†” value
+    // Helper to map label ↔ value
     function mapLabelToValue(inputEl){
         const map=inputEl?.dataset.valueMap?JSON.parse(inputEl.dataset.valueMap):null;
         if(!map) return inputEl?.value||'';
@@ -199,7 +206,7 @@
     window.createPriceField = createPriceField;
     window.mapLabelToValue = mapLabelToValue;
     
-    console.log('âœ… Custom Field Creator functions exposed to window object');
+    console.log('✅ Custom Field Creator functions exposed to window object');
     
 })();
 // Form Injection Module - IIFE
@@ -208,7 +215,7 @@
 (function() {
     'use strict';
     
-    console.log('ðŸ“‹ Form Injection module loaded');
+    console.log('📋 Form Injection module loaded');
     
     // ---------------------------
     // Module State
@@ -241,7 +248,7 @@
                 exclusive_buyer_info: ''
             };
         
-        console.log("ðŸ“‹ Updating pending custom data:", {
+        console.log("📋 Updating pending custom data:", {
             keyName,
             scale,
             bpm,
@@ -273,9 +280,9 @@
                 exclusive_buyer_info
             };
             localStorage.setItem('pendingCustomData', JSON.stringify(pending));
-            console.log("ðŸ’¾ Saved pending custom data to localStorage");
+            console.log("💾 Saved pending custom data to localStorage");
         } else {
-            console.warn("âš ï¸ No data to save - all fields empty");
+            console.warn("⚠️ No data to save - all fields empty");
         }
     }
 
@@ -283,7 +290,7 @@
         const existing = document.getElementById('custom-fields-container');
         if (existing) existing.remove();
         
-        // Also remove Sample-Safeâ„¢ banner if it exists
+        // Also remove Sample-Safe™ banner if it exists
         const banner = document.getElementById('sample-safe-banner');
         if (banner) banner.remove();
         
@@ -300,13 +307,13 @@
         const trackId = window.getTrackId ? window.getTrackId() : null;
         const trackName = window.getTrackName ? window.getTrackName() : null;
         
-        console.log('🔍 fetchExistingCustomData - Track ID:', trackId, 'Track Name:', trackName);
-        console.log('🔍 Current URL:', window.location.pathname);
-        console.log('🔍 getTrackId function available:', typeof window.getTrackId);
+        if (DEBUG) console.log('🔍 fetchExistingCustomData - Track ID:', trackId, 'Track Name:', trackName);
+        if (DEBUG) console.log('🔍 Current URL:', window.location.pathname);
+        if (DEBUG) console.log('🔍 getTrackId function available:', typeof window.getTrackId);
         
         // Return null if no track identifier is available
         if (!trackId && !trackName) {
-            console.log('ℹ️ No track ID or name available for data fetching');
+            if (DEBUG) console.log('ℹ️ No track ID or name available for data fetching');
             return null;
         }
         
@@ -324,11 +331,11 @@
             
             if (data.status === 'success' && data.data) {
                 window.customRecord = data.data;
-                console.log('✅ Successfully fetched existing data:', data.data);
+                if (DEBUG) console.log('✅ Successfully fetched existing data:', data.data);
                 return data.data;
             } else {
                 window.customRecord = null;
-                console.log('ℹ️ No existing data found in database');
+                if (DEBUG) console.log('ℹ️ No existing data found in database');
                 return null;
             }
         } catch (err) {
@@ -339,38 +346,38 @@
     }
 
     async function injectCustomFields(existingData = null, skipFetch = false) {
-        console.log("🎯 Starting custom fields injection...");
-        console.log('🔍 Parameters - existingData:', existingData, 'skipFetch:', skipFetch);
-        console.log('🔍 Current page type - isEditPage:', window.isEditPage ? window.isEditPage() : 'function not available');
+        if (DEBUG) console.log("🎯 Starting custom fields injection...");
+        if (DEBUG) console.log('🔍 Parameters - existingData:', existingData, 'skipFetch:', skipFetch);
+        if (DEBUG) console.log('🔍 Current page type - isEditPage:', window.isEditPage ? window.isEditPage() : 'function not available');
         
         if (isFieldsInjected || document.getElementById('custom-fields-container')) {
-            console.log('⚠️ Custom fields already injected, skipping');
+            if (DEBUG) console.log('⚠️ Custom fields already injected, skipping');
             return;
         }
         
         // Check if core functions are available before proceeding
         const coreReady = window.getTrackId && window.getTrackName && window.isEditPage;
         if (!coreReady && !skipFetch) {
-            console.warn('⚠️ Core functions not ready for injection, waiting...');
+            if (DEBUG) console.warn('⚠️ Core functions not ready for injection, waiting...');
             setTimeout(() => injectCustomFields(existingData, skipFetch), 500);
             return;
         }
         
         // If no existing data provided and we're not skipping fetch, try to fetch from database
         if (!existingData && !skipFetch) {
-            console.log('📡 No existing data provided, fetching from database...');
+            if (DEBUG) console.log('📡 No existing data provided, fetching from database...');
             try {
                 existingData = await fetchExistingCustomData();
                 if (existingData) {
-                    console.log('✅ Successfully fetched existing data:', existingData);
+                    if (DEBUG) console.log('✅ Successfully fetched existing data:', existingData);
                 } else {
-                    console.log('ℹ️ No existing data found, using defaults');
+                    if (DEBUG) console.log('ℹ️ No existing data found, using defaults');
                 }
             } catch (error) {
                 console.error('❌ Error fetching existing data:', error);
             }
         } else if (skipFetch) {
-            console.log('⏭️ Skipping fetch as requested, using provided data:', existingData);
+            if (DEBUG) console.log('⏭️ Skipping fetch as requested, using provided data:', existingData);
         }
         
         // Use defaults if no data found
@@ -391,48 +398,59 @@
 
         const nameField = document.querySelector('input[name="name"]');
         if (!nameField) {
-            console.log("â³ Name field not found yet, setting up observer...");
+            if (DEBUG) console.log("⏳ Name field not found yet, setting up observer...");
             
             // Use a MutationObserver to wait for the name field to appear
             if (!window.customFieldsNameObserver) {
                 let observerAttempts = 0;
                 const maxObserverAttempts = 20; // 10 seconds max wait
                 
-                window.customFieldsNameObserver = new MutationObserver(() => {
-                    observerAttempts++;
-                    const nameFieldNow = document.querySelector('input[name="name"]');
-                    if (nameFieldNow) {
-                        console.log("âœ… Name field appeared! Proceeding with injection...");
-                        window.customFieldsNameObserver.disconnect();
-                        window.customFieldsNameObserver = null;
-                        
-                        // Small delay to ensure form is fully ready
-                        setTimeout(() => {
-                            injectCustomFields(existingData, true); // Skip fetch since we already have data
-                        }, 100);
-                    } else if (observerAttempts >= maxObserverAttempts) {
-                        console.warn("âš ï¸ Name field did not appear after maximum attempts, stopping observer");
-                        window.customFieldsNameObserver.disconnect();
-                        window.customFieldsNameObserver = null;
+                const startObserving = () => {
+                    const targetNode = document.body || document.documentElement;
+                    if (!targetNode) {
+                        if (DEBUG) console.log('⏳ DOM not ready, retrying in 100ms...');
+                        setTimeout(startObserving, 100);
+                        return;
                     }
-                });
+
+                    window.customFieldsNameObserver = new MutationObserver(() => {
+                        observerAttempts++;
+                        const nameFieldNow = document.querySelector('input[name="name"]');
+                        if (nameFieldNow) {
+                            if (DEBUG) console.log("✅ Name field appeared! Proceeding with injection...");
+                            window.customFieldsNameObserver.disconnect();
+                            window.customFieldsNameObserver = null;
+                            
+                            // Small delay to ensure form is fully ready
+                            setTimeout(() => {
+                                injectCustomFields(existingData, true); // Skip fetch since we already have data
+                            }, 100);
+                        } else if (observerAttempts >= maxObserverAttempts) {
+                            if (DEBUG) console.warn("⚠️ Name field did not appear after maximum attempts, stopping observer");
+                            window.customFieldsNameObserver.disconnect();
+                            window.customFieldsNameObserver = null;
+                        }
+                    });
+                    
+                    window.customFieldsNameObserver.observe(targetNode, { 
+                        childList: true, 
+                        subtree: true,
+                        attributes: true,
+                        attributeFilter: ['name']
+                    });
+                    
+                    if (DEBUG) console.log("📡 Name field observer active");
+                };
                 
-                window.customFieldsNameObserver.observe(document.body, { 
-                    childList: true, 
-                    subtree: true,
-                    attributes: true,
-                    attributeFilter: ['name']
-                });
-                
-                console.log("ðŸ“¡ Name field observer active");
+                startObserving();
             }
             return;
         }
 
-        console.log("ðŸ§¹ Clearing any existing custom fields...");
+        if (DEBUG) console.log("📋 Clearing any existing custom fields...");
         clearCustomFields();
         
-        console.log("ðŸ—ï¸ Creating custom fields container...");
+        if (DEBUG) console.log("📋 Creating custom fields container...");
         // Create native container using native form field spacing
         const container = document.createElement('div');
         container.id = 'custom-fields-container';
@@ -449,11 +467,11 @@
         const metadataRow = document.createElement('div');
         metadataRow.className = 'grid grid-cols-3 gap-12 mb-24'; // Use native grid layout with gaps
         
-        console.log("ðŸŽ¹ Creating individual field components...");
+        if (DEBUG) console.log("📋 Creating individual field components...");
         // Create fields using native UI patterns - modified for inline layout
         const keyField = window.createDropdownField ? window.createDropdownField(
             'Key', 'key_name', 'Select Key',
-            ['C', 'C# / Dâ™­', 'D', 'D# / Eâ™­', 'E', 'F', 'F# / Gâ™­', 'G', 'G# / Aâ™­', 'A', 'A# / Bâ™­', 'B'],
+            ['C', 'C# / D♭', 'D', 'D# / E♭', 'E', 'F', 'F# / G♭', 'G', 'G# / A♭', 'A', 'A# / B♭', 'B'],
             existingData.key_name
         ) : document.createElement('div');
         
@@ -470,7 +488,7 @@
         scaleField.classList.remove('mb-24');
         bpmField.classList.remove('mb-24');
         
-        console.log("ðŸ“¦ Assembling field layout...");
+        if (DEBUG) console.log("📦 Assembling field layout...");
         metadataRow.appendChild(keyField);
         metadataRow.appendChild(scaleField);
         metadataRow.appendChild(bpmField);
@@ -483,17 +501,17 @@
             container.appendChild(exclusiveLicensingSection);
         }
         
-        // Add Sample-Safeâ„¢ banner for upload pages
+        // Add Sample-Safe™ banner for upload pages
         if (window.isUploadPage && window.isUploadPage() && window.createSampleSafeBanner) {
             const sampleSafeBanner = window.createSampleSafeBanner();
             container.appendChild(sampleSafeBanner);
         }
         
-        console.log("ðŸ“ Inserting container into DOM...");
+        if (DEBUG) console.log("📍 Inserting container into DOM...");
         // Insert after the name field, respecting native form layout
         try {
             nameField.parentNode.insertBefore(container, nameField.nextSibling);
-            console.log("âœ… Custom fields container successfully inserted into DOM");
+            if (DEBUG) console.log("🎉 Custom fields container successfully inserted into DOM");
             
             // Animate in after a brief delay
             setTimeout(() => {
@@ -502,7 +520,7 @@
                 fieldsReady = true;
                 isFieldsInjected = true;
                 setFieldsInjected(true);
-                console.log("🎉 Custom fields animation complete - fields ready!");
+                if (DEBUG) console.log("🎉 Custom fields animation complete - fields ready!");
             }, 50);
             
         } catch (error) {
@@ -521,7 +539,7 @@
     
     function setFieldsInjected(status) {
         fieldsInjected = status;
-        console.log('📌 Fields injection status set to:', status);
+        if (DEBUG) console.log('📌 Fields injection status set to:', status);
     }
     
     // Global Exposure
@@ -538,14 +556,14 @@
     // Expose state getters
     window.getFieldsReady = () => fieldsReady;
     
-    console.log('âœ… Form Injection functions exposed to window object');
-    
 })();
 // Exclusive Licensing Module - IIFE
 // Extracted from custom-fields.js for modular architecture
 
 (function() {
     'use strict';
+    
+    const DEBUG = false;
     
     // Helper function to check if we're on upload page
     function isUploadPage() {
@@ -882,9 +900,9 @@
         statusButtons.setAttribute('role', 'radiogroup');
         
         const statusOptions = [
-            { value: 'available', label: 'Available', icon: 'âœ“', color: 'green' },
-            { value: 'sold', label: 'Sold', icon: 'â—', color: 'red' },
-            { value: 'not_available', label: 'Not Listed', icon: 'â—‹', color: 'gray' }
+            { value: 'available', label: 'Available', icon: '✓', color: 'green' },
+            { value: 'sold', label: 'Sold', icon: '●', color: 'red' },
+            { value: 'not_available', label: 'Not Listed', icon: '○', color: 'gray' }
         ];
         
         statusOptions.forEach(option => {
@@ -1005,8 +1023,8 @@
         
         const currencies = [
             { value: 'USD', symbol: '$', label: 'USD' },
-            { value: 'EUR', symbol: 'â‚¬', label: 'EUR' },
-            { value: 'GBP', symbol: 'Â£', label: 'GBP' },
+            { value: 'EUR', symbol: '€', label: 'EUR' },
+            { value: 'GBP', symbol: '£', label: 'GBP' },
             { value: 'CAD', symbol: 'C$', label: 'CAD' }
         ];
         
@@ -1136,11 +1154,11 @@
     function formatPrice(price, currency) {
         const symbols = {
             'USD': '$',
-            'EUR': 'â‚¬',
-            'GBP': 'Â£',
+            'EUR': '€',
+            'GBP': '£',
             'CAD': 'C$',
             'AUD': 'A$',
-            'JPY': 'Â¥'
+            'JPY': '¥'
         };
         const symbol = symbols[currency] || currency;
         const formattedPrice = parseFloat(price).toLocaleString(undefined, {
@@ -1346,5 +1364,5 @@
     window.createExclusiveLicensingDisplay = createExclusiveLicensingDisplay;
     window.ensureExclusiveLicensingStyles = ensureExclusiveLicensingStyles;
     
-    console.log('âœ… Exclusive Licensing module loaded successfully');
+    console.log('✅ Exclusive Licensing module loaded successfully');
 })();

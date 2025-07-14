@@ -8,7 +8,7 @@
 
     // Module constants
     const MODULE_NAME = 'BeatPassProducerTagsManager';
-    const DEBUG = true;
+    const DEBUG = false; // Reduced logging for performance
 
     // State management
     let isInitialized = false;
@@ -42,10 +42,21 @@
                 }
             });
 
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
+            function startObserving() {
+                const target = document.body || document.documentElement;
+                if (target) {
+                    if (DEBUG) console.log('Starting MutationObserver for waitForElement');
+                    observer.observe(target, {
+                        childList: true,
+                        subtree: true
+                    });
+                } else {
+                    if (DEBUG) console.log('DOM not ready, retrying in 100ms');
+                    setTimeout(startObserving, 100);
+                }
+            }
+
+            startObserving();
 
             setTimeout(() => {
                 observer.disconnect();
@@ -88,7 +99,7 @@
             return text.trim();
         }).filter(name => name.length > 0);
         
-        if (DEBUG) console.log("ðŸŽ¤ getProducers() found:", producers);
+        if (DEBUG) console.log("🎤 getProducers() found:", producers);
         return producers.join(', ');
     }
 
@@ -114,7 +125,7 @@
             return text.trim();
         }).filter(tag => tag.length > 0);
         
-        if (DEBUG) console.log("ðŸ·ï¸ getTags() found:", tags);
+        if (DEBUG) console.log("🏷️ getTags() found:", tags);
         return tags.join(', ');
     }
 
@@ -164,32 +175,32 @@
         
         const tagsInput = document.querySelector('input[name="tags"]');
         if (!tagsInput) {
-            if (DEBUG) console.log("ðŸ·ï¸ Tags input not found, will retry later");
+            if (DEBUG) console.log("🏷️ Tags input not found, will retry later");
             return;
         }
         
         const container = tagsInput.closest('[role="group"]');
         if (!container) {
-            if (DEBUG) console.log("ðŸ·ï¸ Tags container not found");
+            if (DEBUG) console.log("🏷️ Tags container not found");
             return;
         }
         
         const chipsContainer = container.querySelector('.flex.flex-wrap.items-center.gap-8');
         if (!chipsContainer) {
-            if (DEBUG) console.log("ðŸ·ï¸ Tags chips container not found");
+            if (DEBUG) console.log("🏷️ Tags chips container not found");
             return;
         }
         
         // Check if tags are already restored
         if (chipsContainer.querySelector('.bg-chip')) {
-            if (DEBUG) console.log("ðŸ·ï¸ Tags already restored, skipping");
+            if (DEBUG) console.log("🏷️ Tags already restored, skipping");
             return;
         }
         
         const tags = existingData.tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
         if (tags.length === 0) return;
         
-        if (DEBUG) console.log("ðŸ·ï¸ Restoring tags:", tags);
+        if (DEBUG) console.log("🏷️ Restoring tags:", tags);
         
         // Create and insert tag chips
         tags.forEach(tagName => {
@@ -197,7 +208,7 @@
             chipsContainer.appendChild(chip);
         });
         
-        if (DEBUG) console.log("âœ… Tags restored successfully");
+        if (DEBUG) console.log("✅ Tags restored successfully");
     }
 
     // ---------------------------
@@ -215,7 +226,19 @@
         }, 300);
         
         const observer = new MutationObserver(debouncedRestore);
-        observer.observe(document.body, { childList: true, subtree: true });
+        
+        function startObserving() {
+            const target = document.body || document.documentElement;
+            if (target) {
+                if (DEBUG) console.log('Starting MutationObserver for tags restoration');
+                observer.observe(target, { childList: true, subtree: true });
+            } else {
+                if (DEBUG) console.log('DOM not ready for tags observer, retrying in 100ms');
+                setTimeout(startObserving, 100);
+            }
+        }
+        
+        startObserving();
         
         // Clean up observer after 10 seconds
         setTimeout(() => {
@@ -250,17 +273,17 @@
                 return;
             }
             
-            if (DEBUG) console.log(`ðŸš€ Initializing ${MODULE_NAME}`);
+            if (DEBUG) console.log(`🚀 Initializing ${MODULE_NAME}`);
             
             isInitialized = true;
             
-            if (DEBUG) console.log(`âœ… ${MODULE_NAME} initialized successfully`);
+            if (DEBUG) console.log(`✅ ${MODULE_NAME} initialized successfully`);
         },
         
         // Cleanup
         destroy() {
             isInitialized = false;
-            if (DEBUG) console.log(`ðŸ§¹ ${MODULE_NAME} destroyed`);
+            if (DEBUG) console.log(`🧹 ${MODULE_NAME} destroyed`);
         }
     };
 
@@ -282,7 +305,7 @@
         ProducerTagsManager.init();
     }
 
-    if (DEBUG) console.log(`ðŸ“¦ ${MODULE_NAME} module loaded`);
+    if (DEBUG) console.log(`📦 ${MODULE_NAME} module loaded`);
 
 })();
 // ============================================================
@@ -327,36 +350,47 @@
     
     function waitForElement(selector, timeout = 10000, targetNode = document.body) {
         return new Promise((resolve, reject) => {
-            const element = targetNode.querySelector(selector);
+            const element = targetNode ? targetNode.querySelector(selector) : document.querySelector(selector);
             if (element) {
                 resolve(element);
                 return;
             }
 
-            const observer = new MutationObserver((mutations, obs) => {
-                for (const mutation of mutations) {
-                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                        const element = targetNode.querySelector(selector);
-                        if (element) {
-                            obs.disconnect();
-                            resolve(element);
-                            return;
+            const startObserving = () => {
+                const observeTarget = targetNode || document.body || document.documentElement;
+                if (!observeTarget) {
+                    console.warn('[BeatPassFeatures] DOM not ready for waitForElement observer, retrying...');
+                    setTimeout(startObserving, 100);
+                    return;
+                }
+                
+                const observer = new MutationObserver((mutations, obs) => {
+                    for (const mutation of mutations) {
+                        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                            const element = observeTarget.querySelector(selector);
+                            if (element) {
+                                obs.disconnect();
+                                resolve(element);
+                                return;
+                            }
                         }
                     }
-                }
-            });
+                });
 
-            observer.observe(targetNode, { 
-                childList: true, 
-                subtree: true,
-                attributes: false,
-                characterData: false
-            });
+                observer.observe(observeTarget, { 
+                    childList: true, 
+                    subtree: true,
+                    attributes: false,
+                    characterData: false
+                });
 
-            setTimeout(() => {
-                observer.disconnect();
-                reject(new Error(`Element ${selector} not found within ${timeout}ms`));
-            }, timeout);
+                setTimeout(() => {
+                    observer.disconnect();
+                    reject(new Error(`Element ${selector} not found within ${timeout}ms`));
+                }, timeout);
+            };
+            
+            startObserving();
         });
     }
     
@@ -544,7 +578,7 @@
                                row.children[row.children.length - 2]; // Second to last column (before duration)
             
             if (optionsCell) {
-                const bpmCell = createBPMCell('â‹¯'); // Loading placeholder
+                const bpmCell = createBPMCell('⋯'); // Loading placeholder
                 row.insertBefore(bpmCell, optionsCell);
                 
                 // Update column indices for subsequent columns
@@ -632,19 +666,30 @@
             }
         }, INJECTION_DEBOUNCE);
         
-        tableObserver = new MutationObserver(debounce(() => {
-            const tables = document.querySelectorAll('[role="grid"]');
-            if (tables.length > 0) {
-                debouncedInjectBPMColumn();
+        const startObserving = () => {
+            const targetNode = document.body || document.documentElement;
+            if (!targetNode) {
+                console.warn('[BeatPassBPMColumnEnhancer] DOM not ready for table observer, retrying...');
+                setTimeout(startObserving, 100);
+                return;
             }
-        }, OBSERVER_DEBOUNCE));
+            
+            tableObserver = new MutationObserver(debounce(() => {
+                const tables = document.querySelectorAll('[role="grid"]');
+                if (tables.length > 0) {
+                    debouncedInjectBPMColumn();
+                }
+            }, OBSERVER_DEBOUNCE));
 
-        tableObserver.observe(document.body, { 
-            childList: true, 
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['aria-rowcount']
-        });
+            tableObserver.observe(targetNode, { 
+                childList: true, 
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['aria-rowcount']
+            });
+        };
+        
+        startObserving();
 
         // Also check for existing tables
         setTimeout(() => {
@@ -714,7 +759,7 @@
 
     // Module constants
     const MODULE_NAME = 'BeatPassFormSubmissionHandler';
-    const DEBUG = true;
+    const DEBUG = false; // Reduced logging for performance
     const API_URL = 'key_bpm_handler.php';
 
     // State management
@@ -834,7 +879,7 @@
         const { licensing_type, exclusive_price, exclusive_currency, exclusive_status, exclusive_buyer_info } = getExclusiveLicensingData();
         
         if (DEBUG) {
-            console.log("ðŸ“‹ Updating pending custom data:", {
+            console.log("📋 Updating pending custom data:", {
                 keyName,
                 scale,
                 bpm,
@@ -867,9 +912,9 @@
                 exclusive_buyer_info
             };
             localStorage.setItem('pendingCustomData', JSON.stringify(pending));
-            if (DEBUG) console.log("ðŸ’¾ Saved pending custom data to localStorage");
+            if (DEBUG) console.log("💾 Saved pending custom data to localStorage");
         } else {
-            if (DEBUG) console.warn("âš ï¸ No data to save - all fields empty");
+            if (DEBUG) console.warn("⚠️ No data to save - all fields empty");
         }
     }
 
@@ -899,12 +944,12 @@
             
             if (isEdit) {
                 const trackId = window.getTrackId();
-                console.log('🔄 Auto-save triggered - Track ID:', trackId, 'Edit page:', isEdit);
-                console.log('🔍 getTrackId function available:', typeof window.getTrackId);
-                console.log('🔍 Current URL:', window.location.pathname);
+                if (DEBUG) console.log('🔄 Auto-save triggered - Track ID:', trackId, 'Edit page:', isEdit);
+                if (DEBUG) console.log('🔍 getTrackId function available:', typeof window.getTrackId);
+                if (DEBUG) console.log('🔍 Current URL:', window.location.pathname);
                 
                 if (trackId) {
-                    console.log('💾 Starting auto-save process...');
+                    if (DEBUG) console.log('💾 Starting auto-save process...');
                     
                     const key_name = document.getElementById('key_name')?.value.trim() || '';
                     const scale = document.getElementById('scale')?.value.trim() || '';
@@ -914,7 +959,7 @@
                     const producers = window.getProducers ? window.getProducers() : '';
                     const tags = window.getTags ? window.getTags() : '';
                     
-                    console.log('📊 Field values:', { key_name, scale, bpm, track_name, duration_ms, producers, tags });
+                    if (DEBUG) console.log('📊 Field values:', { key_name, scale, bpm, track_name, duration_ms, producers, tags });
                     
                     // Get exclusive licensing data
                     const licensingData = getExclusiveLicensingData();
@@ -935,11 +980,11 @@
                         exclusive_buyer_info: licensingData.exclusive_buyer_info
                     };
                     
-                    console.log('📤 Auto-save data prepared:', autoSaveData);
+                    if (DEBUG) console.log('📤 Auto-save data prepared:', autoSaveData);
                     
                     const success = await submitCustomData(autoSaveData);
                     if (success) {
-                        console.log('✅ Auto-save completed successfully');
+                        if (DEBUG) console.log('✅ Auto-save completed successfully');
                     } else {
                         console.error('❌ Auto-save failed');
                     }
@@ -947,7 +992,7 @@
                     console.warn('⚠️ Auto-save skipped - no track ID available');
                 }
             } else {
-                console.log('ℹ️ Auto-save skipped - not on edit page');
+                if (DEBUG) console.log('ℹ️ Auto-save skipped - not on edit page');
             }
         }, 1000); // 1 second delay
     }
@@ -960,7 +1005,7 @@
         
         if (pendingData) {
             ({ key_name, scale, bpm, track_name, track_id, playback_url, duration_ms, producers, tags, licensing_type, exclusive_price, exclusive_currency, exclusive_status, exclusive_buyer_info } = pendingData);
-            if (DEBUG) console.log("ðŸ“‹ Using pending data for submission:", pendingData);
+            if (DEBUG) console.log("📋 Using pending data for submission:", pendingData);
         } else {
             key_name = document.getElementById('key_name')?.value.trim() || '';
             scale = document.getElementById('scale')?.value.trim() || '';
@@ -990,7 +1035,7 @@
             exclusive_buyer_info = licensingData.exclusive_buyer_info;
             
             if (DEBUG) {
-                console.log("ðŸ“‹ Using form data for submission:", {
+                console.log("📋 Using form data for submission:", {
                     key_name, scale, bpm, track_name, track_id, playback_url, duration_ms, producers, tags, licensing_type, exclusive_price, exclusive_currency, exclusive_status, exclusive_buyer_info
                 });
             }
@@ -998,17 +1043,17 @@
 
         // Enhanced validation with track name requirement
         if (!track_id) {
-            console.warn("âŒ Cannot submit custom data: missing track_id");
+            console.warn("❌ Cannot submit custom data: missing track_id");
             return false;
         }
 
         if (!track_name || track_name.trim() === '') {
-            console.warn("âš ï¸ Track name is missing - this may cause database issues");
+            console.warn("⚠️ Track name is missing - this may cause database issues");
         }
         
         // Check if we have at least some metadata to submit
         if (!key_name && !scale && !bpm && !track_name && !playback_url && !producers && !tags && licensing_type === 'non_exclusive_only') {
-            console.warn("âŒ No metadata to submit - all fields empty");
+            console.warn("❌ No metadata to submit - all fields empty");
             return false;
         }
 
@@ -1037,11 +1082,11 @@
             if (DEBUG) console.log("Adding duration to payload:", duration_ms);
         }
         
-        if (DEBUG) console.log("ðŸ“¤ Final payload for submission:", payload);
+        if (DEBUG) console.log("📦 Final payload for submission:", payload);
 
         try {
-            console.log('🌐 Making API request to:', API_URL);
-            console.log('📦 Request payload:', payload);
+            if (DEBUG) console.log('🌐 Making API request to:', API_URL);
+            if (DEBUG) console.log('📦 Request payload:', payload);
             
             const res = await fetch(API_URL, {
                 method: 'POST',
@@ -1049,7 +1094,7 @@
                 body: new URLSearchParams(payload)
             });
             
-            console.log('📡 Response status:', res.status, res.statusText);
+            if (DEBUG) console.log('📡 Response status:', res.status, res.statusText);
             
             if (!res.ok) {
                 console.error('❌ HTTP error:', res.status, res.statusText);
@@ -1057,11 +1102,11 @@
             }
             
             const data = await res.json();
-            console.log('📥 API response:', data);
+            if (DEBUG) console.log('📥 API response:', data);
             
             if (data.status === 'success') {
                 localStorage.removeItem('pendingCustomData');
-                console.log('✅ Data submitted successfully to database');
+                if (DEBUG) console.log('✅ Data submitted successfully to database');
                 return true;
             } else {
                 console.error('❌ API returned error:', data.message || 'Unknown error');
@@ -1113,7 +1158,7 @@
                 const trackNameElement = confirmationContainer.querySelector('.text-base.font-bold');
                 if (trackNameElement) {
                     trackName = trackNameElement.textContent.trim();
-                    if (DEBUG) console.log("âœ… Found track name from title element:", trackName);
+                    if (DEBUG) console.log("✅ Found track name from title element:", trackName);
                 }
                 
                 // Fallback: extract track name from URL if title element not found
@@ -1124,7 +1169,7 @@
                     if (urlTrackName) {
                         // Decode URL-encoded track name and convert dashes to spaces
                         trackName = decodeURIComponent(urlTrackName.replace(/-/g, ' '));
-                        if (DEBUG) console.log("ðŸ”„ Extracted track name from URL:", trackName);
+                        if (DEBUG) console.log("🔄 Extracted track name from URL:", trackName);
                     }
                 }
                 
@@ -1132,12 +1177,12 @@
                 if (!trackName) {
                     const customData = JSON.parse(pending);
                     trackName = customData.track_name || '';
-                    if (DEBUG) console.log("âš ï¸ Using track name from pending data:", trackName);
+                    if (DEBUG) console.log("⚠️ Using track name from pending data:", trackName);
                 }
             }
 
             if (trackId) {
-                if (DEBUG) console.log("âœ… Found track ID for confirmation:", trackId, "with name:", trackName);
+                if (DEBUG) console.log("✅ Found track ID for confirmation:", trackId, "with name:", trackName);
                 
                 // Submit the metadata with confirmed track name
                 const customData = JSON.parse(pending);
@@ -1147,12 +1192,12 @@
                 if (trackName && trackName.trim()) {
                     const previousTrackName = customData.track_name || 'none';
                     customData.track_name = trackName.trim();
-                    if (DEBUG) console.log(`ðŸ“ Track name updated: "${previousTrackName}" â†’ "${customData.track_name}"`);
+                    if (DEBUG) console.log(` Track name updated: "${previousTrackName}" → "${customData.track_name}"`);
                 } else {
-                    if (DEBUG) console.warn("âš ï¸ No track name found during confirmation, keeping original:", customData.track_name);
+                    if (DEBUG) console.warn("⚠️ No track name found during confirmation, keeping original:", customData.track_name);
                 }
                 
-                if (DEBUG) console.log("ðŸ“¤ Final confirmation payload:", customData);
+                if (DEBUG) console.log("📦 Final confirmation payload:", customData);
                 await submitCustomData(customData);
                 localStorage.removeItem('pendingCustomData');
                 return;
@@ -1276,7 +1321,7 @@
             const { licensing_type, exclusive_price, exclusive_currency, exclusive_status, exclusive_buyer_info } = getExclusiveLicensingData();
             
             if (DEBUG) {
-                console.log("ðŸ“¤ Form submission - capturing data:", {
+                console.log("📦 Form submission - capturing data:", {
                     key, scale, bpm, trackName: tn, duration, producers, tags,
                     licensing_type, exclusive_price, exclusive_currency, exclusive_status, exclusive_buyer_info
                 });
@@ -1299,7 +1344,7 @@
             };
             
             localStorage.setItem('pendingCustomData', JSON.stringify(pendingData));
-            if (DEBUG) console.log("ðŸ’¾ Saved upload data to localStorage:", pendingData);
+            if (DEBUG) console.log("💾 Saved upload data to localStorage:", pendingData);
         });
         
         const btn = form.querySelector('button[type="submit"]');
@@ -1307,7 +1352,7 @@
             btn.addEventListener('click', () => {
                 // Capture data immediately on button click (backup)
                 const tn = getTrackName();
-                if (DEBUG) console.log("ðŸ”„ Button click - track name capture:", tn);
+                if (DEBUG) console.log("🔄 Button click - track name capture:", tn);
                 
                 setTimeout(() => processPendingCustomDataOnConfirmation(), 500);
             });
@@ -1361,7 +1406,7 @@
                 return;
             }
             
-            if (DEBUG) console.log(`ðŸš€ Initializing ${MODULE_NAME}`);
+            if (DEBUG) console.log(`🚀 Initializing ${MODULE_NAME}`);
             
             // Attach appropriate listeners based on page type
             if (isUploadPage()) {
@@ -1374,14 +1419,14 @@
             
             isInitialized = true;
             
-            if (DEBUG) console.log(`âœ… ${MODULE_NAME} initialized successfully`);
+            if (DEBUG) console.log(`✅ ${MODULE_NAME} initialized successfully`);
         },
         
         // Cleanup
         destroy() {
             isInitialized = false;
             fieldsReady = false;
-            if (DEBUG) console.log(`ðŸ§¹ ${MODULE_NAME} destroyed`);
+            if (DEBUG) console.log(`🧹 ${MODULE_NAME} destroyed`);
         }
     };
 
@@ -1404,18 +1449,18 @@
         FormSubmissionHandler.init();
     }
 
-    if (DEBUG) console.log(`ðŸ“¦ ${MODULE_NAME} module loaded`);
+    if (DEBUG) console.log(`📦 ${MODULE_NAME} module loaded`);
 
 })();
 // ============================================================
 // BeatPassID Fingerprinting System Module
 // Extracted from custom-fields.js
-// Handles audio fingerprinting, duplicate detection, and Sample-Safeâ„¢ warranty
+// Handles audio fingerprinting, duplicate detection, and Sample-Safe™ warranty
 // ============================================================
 (function () {
     'use strict';
 
-    console.log('ðŸ” BeatPassID Fingerprinting System module loaded');
+    console.log('🔍 BeatPassID Fingerprinting System module loaded');
 
     // ---------------------------
     // Module Constants
@@ -1429,7 +1474,7 @@
     // ---------------------------
 
     async function generateFingerprint(playbackUrl, track_id) {
-        console.log(`ðŸ” Generating fingerprint for track ${track_id} with URL: ${playbackUrl}`);
+        console.log(`🔍 Generating fingerprint for track ${track_id} with URL: ${playbackUrl}`);
         
         try {
             const response = await fetch(FINGERPRINT_API, {
@@ -1444,7 +1489,7 @@
             });
             
             const data = await response.json();
-            console.log('ðŸ” Fingerprint generation response:', data);
+            console.log('🔍 Fingerprint generation response:', data);
             
             if (data.success) {
                 return {
@@ -1459,7 +1504,7 @@
                 };
             }
         } catch (error) {
-            console.error('ðŸ” Error generating fingerprint:', error);
+            console.error('🔍 Error generating fingerprint:', error);
             return {
                 success: false,
                 error: 'Network error during fingerprint generation'
@@ -1468,7 +1513,7 @@
     }
 
     async function submitFingerprint(fingerprintData, track_id) {
-        console.log(`ðŸ” Submitting fingerprint for track ${track_id}`);
+        console.log(`🔍 Submitting fingerprint for track ${track_id}`);
         
         try {
             // First, check for duplicates
@@ -1484,7 +1529,7 @@
             });
             
             const duplicateCheck = await duplicateCheckResponse.json();
-            console.log('ðŸ” Duplicate check response:', duplicateCheck);
+            console.log('🔍 Duplicate check response:', duplicateCheck);
             
             if (duplicateCheck.isDuplicate) {
                 return {
@@ -1511,7 +1556,7 @@
             });
             
             const submitResult = await submitResponse.json();
-            console.log('ðŸ” Fingerprint submission response:', submitResult);
+            console.log('🔍 Fingerprint submission response:', submitResult);
             
             return {
                 success: submitResult.success || false,
@@ -1519,7 +1564,7 @@
             };
             
         } catch (error) {
-            console.error('ðŸ” Error submitting fingerprint:', error);
+            console.error('🔍 Error submitting fingerprint:', error);
             return {
                 success: false,
                 error: 'Network error during fingerprint submission'
@@ -1528,7 +1573,7 @@
     }
 
     async function deleteFingerprintFromDatabase(track_id) {
-        console.log(`ðŸ” Deleting fingerprint for track ${track_id} due to ToS violation`);
+        console.log(`🔍 Deleting fingerprint for track ${track_id} due to ToS violation`);
         
         try {
             const response = await fetch(API_URL, {
@@ -1544,11 +1589,11 @@
             });
             
             const result = await response.json();
-            console.log('ðŸ” Fingerprint deletion response:', result);
+            console.log('🔍 Fingerprint deletion response:', result);
             
             return result;
         } catch (error) {
-            console.error('ðŸ” Error deleting fingerprint:', error);
+            console.error('🔍 Error deleting fingerprint:', error);
             return {
                 success: false,
                 error: 'Network error during fingerprint deletion'
@@ -1572,7 +1617,7 @@
                 duplicateInfo: data.duplicateInfo || {}
             };
         } catch (error) {
-            console.error('ðŸ” Error checking playback URL status:', error);
+            console.error('🔍 Error checking playback URL status:', error);
             return {
                 hasFingerprint: false,
                 isDuplicate: false,
@@ -1680,24 +1725,24 @@
                     dashboard.remove();
                 }
             }, 300);
-            console.log('ðŸ” Fingerprint dashboard removed');
+            console.log('🔍 Fingerprint dashboard removed');
         }
     }
 
     function injectFingerprintDashboard() {
         if (!window.isEditPage || !window.isEditPage()) {
-            console.log('ðŸ” Not on edit page, skipping dashboard injection');
+            console.log('🔍 Not on edit page, skipping dashboard injection');
             return;
         }
         
         if (document.getElementById('fingerprint-dashboard')) {
-            console.log('ðŸ” Dashboard already exists, skipping injection');
+            console.log('🔍 Dashboard already exists, skipping injection');
             return;
         }
         
         const form = document.querySelector('form');
         if (!form) {
-            console.warn('ðŸ” No form found for dashboard injection');
+            console.warn('🔍 No form found for dashboard injection');
             return;
         }
         
@@ -1715,11 +1760,11 @@
             }
         }
         
-        console.log('ðŸ” Fingerprint Dashboard injected successfully');
+        console.log('🔍 Fingerprint Dashboard injected successfully');
         
         // Initialize dashboard content with multiple attempts for reliability
         setTimeout(async () => {
-            console.log('ðŸ” Initializing dashboard content...');
+            console.log('🔍 Initializing dashboard content...');
             await updateDashboardContent();
             observePlaybackURLChanges();
             
@@ -1727,7 +1772,7 @@
             setTimeout(async () => {
                 const content = document.getElementById('dashboard-content');
                 if (content && content.innerHTML.trim() === '') {
-                    console.log('ðŸ” Dashboard content empty, retrying...');
+                    console.log('🔍 Dashboard content empty, retrying...');
                     await updateDashboardContent();
                 }
             }, 1000);
@@ -1810,17 +1855,17 @@
     async function updateDashboardContent() {
         const content = document.getElementById('dashboard-content');
         if (!content) {
-            console.warn('ðŸ” Dashboard content element not found');
+            console.warn('🔍 Dashboard content element not found');
             return;
         }
         
         const track_id = window.getTrackId ? window.getTrackId() : null;
         if (!track_id) {
-            console.warn('ðŸ” No track ID found for dashboard update');
+            console.warn('🔍 No track ID found for dashboard update');
             return;
         }
         
-        console.log(`ðŸ” Updating dashboard content for track ID: ${track_id}`);
+        console.log(`🔍 Updating dashboard content for track ID: ${track_id}`);
         
         // Get current playback URL from form
         const playbackInput = document.querySelector('input[name="src"]') || 
@@ -1828,12 +1873,12 @@
             document.querySelector('input[type="url"][name="src"]');
         
         const currentURL = playbackInput ? playbackInput.value.trim() : '';
-        console.log(`ðŸ” Current playback URL: ${currentURL ? 'Present' : 'None'}`);
+        console.log(`🔍 Current playback URL: ${currentURL ? 'Present' : 'None'}`);
         
         // Get fingerprint status from database (includes existing metadata)
-        console.log('ðŸ” Fetching fingerprint status from database...');
+        console.log('🔍 Fetching fingerprint status from database...');
         const statusInfo = await checkPlaybackURLStatus(track_id);
-        console.log('ðŸ” Fingerprint status received:', {
+        console.log('🔍 Fingerprint status received:', {
             hasFingerprint: statusInfo.hasFingerprint,
             isDuplicate: statusInfo.isDuplicate,
             playbackUrl: statusInfo.playbackUrl ? 'Present' : 'None'
@@ -1848,7 +1893,7 @@
                 existingCustomData = metadataResult.data;
             }
         } catch (error) {
-            console.log('ðŸ” Could not fetch existing metadata:', error);
+            console.log('🔍 Could not fetch existing metadata:', error);
         }
         
         // Get metadata completeness (checks both form and database)
@@ -1858,7 +1903,7 @@
         const urlChanged = currentURL && statusInfo.playbackUrl && 
                           currentURL !== statusInfo.playbackUrl;
         
-        console.log('ðŸ” Dashboard update:', {
+        console.log('🔍 Dashboard update:', {
             currentURL: currentURL ? 'Present' : 'None',
             hasFingerprint: statusInfo.hasFingerprint,
             urlChanged,
@@ -1912,7 +1957,7 @@
             document.querySelector('input[type="url"][name="src"]');
         
         if (!playbackInput) {
-            console.warn('ðŸ” Playback URL input not found for observation');
+            console.warn('🔍 Playback URL input not found for observation');
             return;
         }
         
@@ -1921,7 +1966,7 @@
         const checkForChanges = () => {
             const currentValue = playbackInput.value;
             if (currentValue !== lastValue) {
-                console.log('ðŸ” Playback URL changed, updating dashboard');
+                console.log('🔍 Playback URL changed, updating dashboard');
                 lastValue = currentValue;
                 setTimeout(updateDashboardContent, 500); // Debounce updates
             }
@@ -1935,7 +1980,7 @@
         // Periodic check as fallback
         setInterval(checkForChanges, 2000);
         
-        console.log('ðŸ” Playback URL change observation initialized');
+        console.log('🔍 Playback URL change observation initialized');
     }
 
     // ---------------------------
@@ -1943,7 +1988,7 @@
     // ---------------------------
 
     async function startFingerprintingProcess(button = null, track_id = null, fromDashboard = false) {
-        console.log('ðŸ” Starting fingerprinting process...');
+        console.log('🔍 Starting fingerprinting process...');
         
         // Set flag to prevent redirects during fingerprinting
         window.fingerprintOperationInProgress = true;
@@ -1955,7 +2000,7 @@
             }
             
             if (!track_id) {
-                console.error('ðŸ” No track ID available for fingerprinting');
+                console.error('🔍 No track ID available for fingerprinting');
                 return;
             }
             
@@ -1965,13 +2010,13 @@
                 document.querySelector('input[type="url"][name="src"]');
             
             if (!playbackInput || !playbackInput.value.trim()) {
-                console.error('ðŸ” No playback URL found');
+                console.error('🔍 No playback URL found');
                 showNotification('Please add a playback URL first', 'error');
                 return;
             }
             
             const playbackUrl = playbackInput.value.trim();
-            console.log('ðŸ” Using playback URL:', playbackUrl);
+            console.log('🔍 Using playback URL:', playbackUrl);
             
             // Fetch existing custom data for validation
             let existingCustomData = null;
@@ -1982,13 +2027,13 @@
                     existingCustomData = result.data;
                 }
             } catch (error) {
-                console.log('ðŸ” Could not fetch existing data:', error);
+                console.log('🔍 Could not fetch existing data:', error);
             }
             
             // Check metadata completeness
             const metadata = getMetadataCompleteness(existingCustomData);
             if (!metadata.isComplete) {
-                console.error('ðŸ” Metadata incomplete:', metadata.missing);
+                console.error('🔍 Metadata incomplete:', metadata.missing);
                 showNotification(`Please complete: ${metadata.missing.join(', ')}`, 'warning');
                 return;
             }
@@ -2008,7 +2053,7 @@
             }
             
             // Save playback URL and metadata to database first
-            console.log('ðŸ” Saving playback URL and metadata...');
+            console.log('🔍 Saving playback URL and metadata...');
             const saveResponse = await fetch(API_URL, {
                 method: 'POST',
                 headers: {
@@ -2030,14 +2075,14 @@
             });
             
             const saveResult = await saveResponse.json();
-            console.log('ðŸ” Save response:', saveResult);
+            console.log('🔍 Save response:', saveResult);
             
             // Generate fingerprint
-            console.log('ðŸ” Generating fingerprint...');
+            console.log('🔍 Generating fingerprint...');
             const fingerprintResult = await generateFingerprint(playbackUrl, track_id);
             
             if (!fingerprintResult.success) {
-                console.error('ðŸ” Fingerprint generation failed:', fingerprintResult.error);
+                console.error('🔍 Fingerprint generation failed:', fingerprintResult.error);
                 showNotification('Failed to generate fingerprint: ' + fingerprintResult.error, 'error');
                 
                 // Reset UI
@@ -2056,11 +2101,11 @@
             }
             
             // Submit fingerprint to database
-            console.log('ðŸ” Submitting fingerprint to database...');
+            console.log('🔍 Submitting fingerprint to database...');
             const submitResult = await submitFingerprint(fingerprintResult, track_id);
             
             if (submitResult.isDuplicate) {
-                console.log('ðŸ” Duplicate detected:', submitResult);
+                console.log('🔍 Duplicate detected:', submitResult);
                 
                 if (!submitResult.isAuthentic) {
                     // ToS violation - delete any fingerprint data
@@ -2073,14 +2118,15 @@
                     showNotification('Duplicate content detected - Terms of Service violation', 'error');
                 } else {
                     // Authentic duplicate
-                    console.log('ðŸ” Authentic duplicate detected');
+                    console.log('🔍 Authentic duplicate detected');
                     if (dashboardContent) {
                         await updateDashboardContent();
                     }
+
                     showNotification('Authentic original detected with duplicates blocked', 'info');
                 }
             } else if (submitResult.success) {
-                console.log('ðŸ” Fingerprinting completed successfully');
+                console.log('🔍 Fingerprinting completed successfully');
                 
                 if (dashboardContent) {
                     await updateDashboardContent();
@@ -2088,7 +2134,7 @@
                 
                 showNotification('BeatPassID protection activated successfully!', 'success');
             } else {
-                console.error('ðŸ” Fingerprint submission failed:', submitResult.error);
+                console.error('🔍 Fingerprint submission failed:', submitResult.error);
                 showNotification('Failed to save fingerprint: ' + (submitResult.error || 'Unknown error'), 'error');
                 
                 if (dashboardContent) {
@@ -2103,7 +2149,7 @@
             }
             
         } catch (error) {
-            console.error('ðŸ” Error in fingerprinting process:', error);
+            console.error('🔍 Error in fingerprinting process:', error);
             showNotification('Fingerprinting process failed: ' + error.message, 'error');
             
             // Reset UI
@@ -2171,7 +2217,7 @@
                     </svg>
                 </div>
                 <h2 class="text-2xl font-bold text-white mb-8">Activate BeatPassID Protection</h2>
-                <p class="text-white/70 text-sm leading-relaxed">Create an unbreakable digital DNA for your track with our Sample-Safeâ„¢ guarantee</p>
+                <p class="text-white/70 text-sm leading-relaxed">Create an unbreakable digital DNA for your track with our Sample-Safe™ guarantee</p>
             </div>
             
             <div class="space-y-16 mb-24">
@@ -2180,7 +2226,7 @@
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="#10b981">
                             <path d="M12 1L3 5V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V5L12 1M10 17L6 13L7.41 11.59L10 14.17L16.59 7.58L18 9L10 17Z"/>
                         </svg>
-                        Sample-Safeâ„¢ Producer Warranty
+                        Sample-Safe™ Producer Warranty
                     </h3>
                     <p class="text-xs text-white/80 leading-relaxed">By activating BeatPassID, you warrant to buyers that all samples in this track are properly cleared and licensed, making it safe for commercial use without copyright infringement risk.</p>
                 </div>
@@ -2364,7 +2410,7 @@
         
         const beatPassIDDesc = document.createElement('p');
         beatPassIDDesc.className = 'text-sm text-white/80 leading-relaxed mb-16';
-        beatPassIDDesc.textContent = 'BeatPassID is our military-grade acoustic fingerprinting system that creates an unchangeable digital DNA for your track. Combined with our Sample-Safeâ„¢ guarantee, it ensures producers warrant to buyers that all samples are cleared and tracks are safe for commercial use.';
+        beatPassIDDesc.textContent = 'BeatPassID is our military-grade acoustic fingerprinting system that creates an unchangeable digital DNA for your track. Combined with our Sample-Safe™ guarantee, it ensures producers warrant to buyers that all samples are cleared and tracks are safe for commercial use.';
         
         // Benefits grid
         const benefitsGrid = document.createElement('div');
@@ -2385,7 +2431,7 @@
             },
             {
                 icon: 'verified_user',
-                title: 'Sample-Safeâ„¢ Guarantee',
+                title: 'Sample-Safe™ Guarantee',
                 description: 'Producer warranty: All samples cleared, safe for commercial use',
                 color: '#10b981'
             },
@@ -2425,7 +2471,7 @@
         beatPassIDExplainer.appendChild(beatPassIDDesc);
         beatPassIDExplainer.appendChild(benefitsGrid);
         
-        // Sample-Safeâ„¢ detailed explanation
+        // Sample-Safe™ detailed explanation
         const sampleSafeExplainer = document.createElement('div');
         sampleSafeExplainer.className = 'mt-16 p-12 rounded-lg';
         sampleSafeExplainer.style.cssText = `
@@ -2439,7 +2485,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#10b981">
                 <path d="M12 1L3 5V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V5L12 1M10 17L6 13L7.41 11.59L10 14.17L16.59 7.58L18 9L10 17Z"/>
             </svg>
-            Sample-Safeâ„¢ Producer Warranty
+            Sample-Safe™ Producer Warranty
         `;
         
         const sampleSafeDesc = document.createElement('p');
@@ -2510,7 +2556,7 @@
                 description: 'Track protected with producer warranty',
                 icon: 'shield',
                 status: 'disabled',
-                action: 'Sample-Safeâ„¢ warranty: All samples cleared for commercial use',
+                action: 'Sample-Safe™ warranty: All samples cleared for commercial use',
                 color: '#10b981',
                 techDetail: 'Producer warrants samples are cleared; immutable proof of ownership'
             }
@@ -2521,7 +2567,7 @@
             stepsContainer.appendChild(stepElement);
         });
         
-        // Educational call to action with Sample-Safeâ„¢ emphasis
+        // Educational call to action with Sample-Safe™ emphasis
         const ctaContainer = document.createElement('div');
         ctaContainer.className = 'mt-16 p-16 rounded-lg';
         ctaContainer.style.cssText = `
@@ -2546,11 +2592,11 @@
         
         const ctaTitle = document.createElement('h5');
         ctaTitle.className = 'font-bold text-white text-center mb-8 text-lg';
-        ctaTitle.textContent = 'Ready to Activate Sample-Safeâ„¢ Protection?';
+        ctaTitle.textContent = 'Ready to Activate Sample-Safe™ Protection?';
         
         const ctaText = document.createElement('p');
         ctaText.className = 'text-sm text-white/80 text-center leading-relaxed';
-        ctaText.textContent = 'Add your track\'s playback URL to the "Source file URL" field above to begin creating its unbreakable digital DNA. This activates our Sample-Safeâ„¢ guarantee where you warrant to buyers that all samples are cleared and the track is safe for commercial use.';
+        ctaText.textContent = 'Add your track\'s playback URL to the "Source file URL" field above to begin creating its unbreakable digital DNA. This activates our Sample-Safe™ guarantee where you warrant to buyers that all samples are cleared and the track is safe for commercial use.';
         
         ctaHeader.appendChild(ctaIcon);
         ctaHeader.appendChild(ctaTitle);
@@ -2562,7 +2608,7 @@
         
         const indicators = [
             { icon: 'security', text: 'Military-Grade Security' },
-            { icon: 'verified_user', text: 'Producer Warranty: Sample-Safeâ„¢' },
+            { icon: 'verified_user', text: 'Producer Warranty: Sample-Safe™' },
             { icon: 'schedule', text: 'Immutable Timestamp' }
         ];
         
@@ -2791,7 +2837,7 @@
                 color: '#ef4444'
             },
             {
-                title: 'Sample-Safeâ„¢ Compliance',
+                title: 'Sample-Safe™ Compliance',
                 description: 'Complete metadata ensures your producer warranty covers all aspects of the track',
                 icon: 'verified_user',
                 color: '#10b981'
@@ -2937,7 +2983,7 @@
                 color: '#ef4444'
             },
             {
-                title: 'Activates Sample-Safeâ„¢ Warranty',
+                title: 'Activates Sample-Safe™ Warranty',
                 description: 'You warrant to buyers that all samples are cleared and the track is safe for commercial use',
                 icon: 'verified_user',
                 color: '#10b981'
@@ -3160,7 +3206,7 @@
                     Your track has been verified as the authentic original. We've detected and blocked <strong>${statusInfo.duplicateCount}</strong> unauthorized ${statusInfo.duplicateCount === 1 ? 'copy' : 'copies'} from being uploaded to the platform.
                 </div>
                 <div class="text-xs text-white/70 leading-relaxed">
-                    <strong>Sample-Safeâ„¢ Warranty Active:</strong> You warrant to buyers that all samples in this track are properly cleared and licensed, making it safe for commercial use without copyright infringement risk.
+                    <strong>Sample-Safe™ Warranty Active:</strong> You warrant to buyers that all samples in this track are properly cleared and licensed, making it safe for commercial use without copyright infringement risk.
                 </div>
             `;
         } else if (statusType === 'violation') {
@@ -3186,7 +3232,7 @@
                     </div>
                     <div class="flex items-start gap-8">
                         <div class="w-4 h-4 rounded-full bg-red-500/30 border border-red-500/50 flex-shrink-0 mt-1"></div>
-                        <div><strong>Platform Integrity:</strong> Our Sample-Safeâ„¢ guarantee requires unique, original content to maintain trust</div>
+                        <div><strong>Platform Integrity:</strong> Our Sample-Safe™ guarantee requires unique, original content to maintain trust</div>
                     </div>
                 </div>
             `;
@@ -3268,7 +3314,7 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="#10b981">
                                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
                             </svg>
-                            <span>Sample-Safeâ„¢ warranty active</span>
+                            <span>Sample-Safe™ warranty active</span>
                         </div>
                         <div class="flex items-center gap-8 text-white/80">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="#10b981">
@@ -3279,7 +3325,7 @@
                     </div>
                 </div>
                 <div class="text-xs text-white/70 leading-relaxed mt-12 pt-12 border-t border-white/10">
-                    <strong>Sample-Safeâ„¢ Producer Warranty:</strong> By activating BeatPassID, you warrant to buyers that all samples in this track are properly cleared and licensed, making it safe for commercial use without copyright infringement risk.
+                    <strong>Sample-Safe™ Producer Warranty:</strong> By activating BeatPassID, you warrant to buyers that all samples in this track are properly cleared and licensed, making it safe for commercial use without copyright infringement risk.
                 </div>
             `;
         }
@@ -3372,7 +3418,7 @@
                     <strong>Why This Failed:</strong> Our platform maintains strict duplicate content policies to ensure:
                     <ul class="list-disc list-inside mt-4 space-y-2 ml-4">
                         <li>Platform integrity and trust</li>
-                        <li>Sample-Safeâ„¢ compliance</li>
+                        <li>Sample-Safe™ compliance</li>
                         <li>Clear exclusive licensing rights</li>
                         <li>Protection of original creators</li>
                     </ul>

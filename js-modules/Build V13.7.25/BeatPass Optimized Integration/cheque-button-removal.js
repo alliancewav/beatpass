@@ -7,6 +7,7 @@
     // ============================================================
     // Configuration
     // ============================================================
+    const DEBUG = false; // Reduced logging for performance
     const TARGET_PATHS = [
         '/backstage/requests/become-artist',
         '/backstage/requests/claim-artist'
@@ -129,6 +130,14 @@
             observer.disconnect();
         }
         
+        // Wait for document.body to be available
+        const targetNode = document.body || document.documentElement;
+        if (!targetNode) {
+            if (DEBUG) console.warn('[BeatPass] DOM not ready for observer, retrying...');
+            setTimeout(setupDOMObserver, 100);
+            return;
+        }
+        
         observer = new MutationObserver((mutations) => {
             let shouldCheck = false;
             
@@ -163,10 +172,12 @@
             }
         });
         
-        observer.observe(document.body, { 
+        observer.observe(targetNode, { 
             childList: true, 
             subtree: true 
         });
+        
+        if (DEBUG) console.log('[BeatPass] Cheque button observer setup complete');
     }
 
     // ============================================================

@@ -7,6 +7,7 @@
     // ============================================================
     // Configuration
     // ============================================================
+    const DEBUG = false; // Reduced logging for performance
     const AD_CHECK_INTERVAL = 500; // Check for ads every 500ms
     const AD_SELECTORS = [
         'div.ad-host.general_top-host',
@@ -40,13 +41,13 @@
                 if (isAdElement(ad)) {
                     ad.remove();
                     removedCount++;
-                    console.log("Removed ad element:", ad);
+                    if (DEBUG) console.log("Removed ad element:", ad);
                 }
             });
         });
 
         if (removedCount > 0) {
-            console.log(`[BeatPass] Removed ${removedCount} ad element(s)`);
+            if (DEBUG) console.log(`[BeatPass] Removed ${removedCount} ad element(s)`);
         }
     }
 
@@ -79,16 +80,26 @@
             observer.disconnect();
         }
         
+        // Wait for document.body to be available
+        const targetNode = document.body || document.documentElement;
+        if (!targetNode) {
+            if (DEBUG) console.warn('[BeatPass] DOM not ready for observer, retrying...');
+            setTimeout(setupDOMObserver, 100);
+            return;
+        }
+        
         observer = new MutationObserver(() => {
             if (shouldHideAds()) {
                 removeAds();
             }
         });
         
-        observer.observe(document.body, { 
+        observer.observe(targetNode, { 
             childList: true, 
             subtree: true 
         });
+        
+        if (DEBUG) console.log('[BeatPass] DOM observer setup complete');
     }
 
     // ============================================================
@@ -177,7 +188,7 @@
             const src = element.src || element.data;
             if (src && isAdUrl(src)) {
                 element.style.display = 'none';
-                console.log('[BeatPass] Hidden suspicious ad element:', element);
+                if (DEBUG) console.log('[BeatPass] Hidden suspicious ad element:', element);
             }
         });
     }

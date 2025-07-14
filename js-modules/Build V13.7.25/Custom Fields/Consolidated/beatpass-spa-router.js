@@ -8,7 +8,7 @@
 
     // Module constants
     const MODULE_NAME = 'BeatPassSPARouter';
-    const DEBUG = true;
+    const DEBUG = false; // Reduced logging for performance
 
     // State management
     let isInitialized = false;

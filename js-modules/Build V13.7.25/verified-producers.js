@@ -2,6 +2,7 @@
 // Verified Producers Badge Module (extracted from BeatpassOptimizedIntegration.js)
 // ============================================================
 (function() {
+    const DEBUG = false; // Reduced logging for performance
     // Utility: Save to cache
     function saveToCache(key, data, ttl) {
         // Use VerifiedProducersInitManager cache if available
@@ -155,13 +156,23 @@
     function setupVerifiedBadgeObserver() {
         // Use VerifiedProducersInitManager if available for centralized observer management
         if (window.VerifiedProducersInitManager && window.VerifiedProducersInitManager.isInitialized()) {
-            console.log('[VerifiedProducers] MutationObserver managed by VerifiedProducersInitManager');
+            if (DEBUG) console.log('[VerifiedProducers] MutationObserver managed by VerifiedProducersInitManager');
             return; // Manager handles the observer
         }
         
-        // Fallback to original observer setup
-        const observer = new MutationObserver(() => applyVerifiedBadges());
-        observer.observe(document.body, { childList: true, subtree: true });
+        // Fallback to original observer setup with DOM readiness check
+        function setupObserver() {
+            const targetNode = document.body || document.documentElement;
+            if (!targetNode) {
+                if (DEBUG) console.warn('[BeatPass] DOM not ready for verified producers observer, retrying...');
+                setTimeout(setupObserver, 100);
+                return;
+            }
+            const observer = new MutationObserver(() => applyVerifiedBadges());
+            observer.observe(targetNode, { childList: true, subtree: true });
+            if (DEBUG) console.log('[BeatPass] Verified producers observer setup complete');
+        }
+        setupObserver();
     }
 
     // Global initialization function for SPA routing

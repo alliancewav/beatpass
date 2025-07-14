@@ -2,6 +2,7 @@
 // 7. CD Spin Animation for Track Images
 // ============================================================
 (function() {
+    const DEBUG = false;
     const BASE_SPEED_MIN = 5, BASE_SPEED_MAX = 9;
     const HOVER_FRACTION = 0.3, HOVER_SCALE = 1.03;
     const CLICK_POP_SCALE = 1.1, CLICK_POP_DURATION = 150;
@@ -88,16 +89,28 @@
     // Create mutation observer only if manager is not available
     let mutObserver;
     if (!window.CDSpinInitManager) {
-        mutObserver = new MutationObserver(mutations => {
-            mutations.forEach(mut => {
-                mut.addedNodes.forEach(node => {
-                    if (node.nodeType === 1 && node.tagName === "IMG" && node.src.includes("track_image")) {
-                        attachSpinLogic(node);
-                        if (io) io.observe(node);
-                    }
+        const startObserving = () => {
+            const targetNode = document.body || document.documentElement;
+            if (!targetNode) {
+                if (DEBUG) console.log('[CDSpin] DOM not ready, retrying in 100ms...');
+                setTimeout(startObserving, 100);
+                return;
+            }
+
+            mutObserver = new MutationObserver(mutations => {
+                mutations.forEach(mut => {
+                    mut.addedNodes.forEach(node => {
+                        if (node.nodeType === 1 && node.tagName === "IMG" && node.src.includes("track_image")) {
+                            attachSpinLogic(node);
+                            if (io) io.observe(node);
+                        }
+                    });
                 });
             });
-        });
+
+            mutObserver.observe(targetNode, { childList: true, subtree: true });
+        };
+        startObserving();
     }
 
     function pruneDeadDiscs() {
@@ -123,11 +136,8 @@
         }
         
         // Fallback to original initialization
-        console.log('[CDSpin] Using fallback initialization');
+        if (DEBUG) console.log('[CDSpin] Using fallback initialization');
         scanForTrackImages();
-        if (mutObserver) {
-            mutObserver.observe(document.body, { childList: true, subtree: true });
-        }
         setInterval(() => {
             scanForTrackImages();
             pruneDeadDiscs();

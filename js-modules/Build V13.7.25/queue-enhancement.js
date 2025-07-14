@@ -6,6 +6,8 @@
 
 (function() {
     'use strict';
+    
+    const DEBUG = false; // Reduced logging for performance
 
     // Configuration
     const CONFIG = {
@@ -197,12 +199,22 @@
                 }
             });
             
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['class', 'data-testid']
-            });
+            function startObserving() {
+                const targetNode = document.body || document.documentElement;
+                if (!targetNode) {
+                    if (DEBUG) console.warn('[BeatPass] DOM not ready for queue enhancement observer, retrying...');
+                    setTimeout(startObserving, 100);
+                    return;
+                }
+                observer.observe(targetNode, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['class', 'data-testid']
+                });
+                if (DEBUG) console.log('[BeatPass] Queue enhancement observer setup complete');
+            }
+            startObserving();
             
             // Fallback timeout
             timeoutId = setTimeout(() => {
@@ -375,10 +387,20 @@
             
             const pill = section.querySelector('.bp-now-playing-pill');
             if (pill) {
-                const pillObserver = new MutationObserver(() => {
-                    pill.textContent = 'Now Playing';
-                });
-                pillObserver.observe(pill, { childList: true, subtree: true, characterData: true });
+                const startObserving = () => {
+                    if (!pill || !document.body) {
+                        console.warn('[QueueEnhancement] DOM not ready for pill observer, retrying...');
+                        setTimeout(startObserving, 100);
+                        return;
+                    }
+                    
+                    const pillObserver = new MutationObserver(() => {
+                        pill.textContent = 'Now Playing';
+                    });
+                    pillObserver.observe(pill, { childList: true, subtree: true, characterData: true });
+                };
+                
+                startObserving();
             }
             
             return section;

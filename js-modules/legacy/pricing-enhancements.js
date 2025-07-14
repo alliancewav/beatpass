@@ -1,4 +1,4 @@
-﻿/**
+/**
  * BeatPass Pricing Table Native Carousel Enhancement
  * Transforms the pricing table into a native carousel with infinite scrolling
  * optimized for 4 plans: ALL 4 visible on desktop, 1 on mobile.

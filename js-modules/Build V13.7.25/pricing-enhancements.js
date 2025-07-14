@@ -1,4 +1,4 @@
-﻿/**
+/**
  * BeatPass Pricing Table Native Carousel Enhancement
  * Transforms the pricing table into a native carousel with infinite scrolling
  * optimized for 4 plans: ALL 4 visible on desktop, 1 on mobile.
@@ -5732,42 +5732,53 @@
                 this.observer.disconnect();
             }
 
-            this.observer = new MutationObserver((mutations) => {
-                for (const mutation of mutations) {
-                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                        for (const node of mutation.addedNodes) {
-                            if (node.nodeType === Node.ELEMENT_NODE) {
-                                const nodeText = node.textContent?.toLowerCase() || '';
-                                if (nodeText.includes('plan') || nodeText.includes('pricing') || nodeText.includes('$')) {
-                                    log('Observer detected potential pricing content');
-                                    setTimeout(() => {
-                                        const { container, cards } = this.findPricingElements();
-                                        if (container && cards.length > 0 && !this.isInitialized) {
-                                            log('Observer found pricing elements');
-                                            this.observer.disconnect();
-                                            this.setupCarousel(container, cards);
-                                        }
-                                    }, 200);
-                                    return;
+            const startObserving = () => {
+                const targetNode = document.body || document.documentElement;
+                if (!targetNode) {
+                    if (DEBUG_MODE) console.log('[BeatPass Pricing] DOM not ready, retrying in 100ms...');
+                    setTimeout(startObserving, 100);
+                    return;
+                }
+
+                this.observer = new MutationObserver((mutations) => {
+                    for (const mutation of mutations) {
+                        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                            for (const node of mutation.addedNodes) {
+                                if (node.nodeType === Node.ELEMENT_NODE) {
+                                    const nodeText = node.textContent?.toLowerCase() || '';
+                                    if (nodeText.includes('plan') || nodeText.includes('pricing') || nodeText.includes('$')) {
+                                        log('Observer detected potential pricing content');
+                                        setTimeout(() => {
+                                            const { container, cards } = this.findPricingElements();
+                                            if (container && cards.length > 0 && !this.isInitialized) {
+                                                log('Observer found pricing elements');
+                                                this.observer.disconnect();
+                                                this.setupCarousel(container, cards);
+                                            }
+                                        }, 200);
+                                        return;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            });
+                });
 
-            this.observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
+                this.observer.observe(targetNode, {
+                    childList: true,
+                    subtree: true
+                });
 
-            setTimeout(() => {
-                if (this.observer && !this.isInitialized) {
-                    log('Observer timeout reached');
-                    this.observer.disconnect();
-                    this.observer = null;
-                }
-            }, 30000);
+                setTimeout(() => {
+                    if (this.observer && !this.isInitialized) {
+                        log('Observer timeout reached');
+                        this.observer.disconnect();
+                        this.observer = null;
+                    }
+                }, 30000);
+            };
+
+            startObserving();
         }
 
         setupCarousel(pricingContainer, pricingCards) {

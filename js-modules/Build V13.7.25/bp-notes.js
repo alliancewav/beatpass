@@ -2,6 +2,7 @@
 // 11. Artist Profile Pinned Message Feature (Popup, Story Ring, Artist Page Only)
 // ============================================================
 (function() {
+    const DEBUG = false; // Reduced logging for performance
     const PIN_CONTAINER_ID = 'artist-pin-container';
     const PIN_RING_CLASS = 'artist-has-pin-ring';
     const MODAL_ID = 'artist-pin-modal';
@@ -1913,7 +1914,19 @@
         setTimeout(render, 0);
     }, 300);
     ['load', 'spa-route-change', 'popstate'].forEach(ev => window.addEventListener(ev, re));
-    new MutationObserver(re).observe(document.body, { childList: true, subtree: true });
+    
+    // Wait for document.body to be available before setting up observer
+    function setupMutationObserver() {
+        const targetNode = document.body || document.documentElement;
+        if (!targetNode) {
+            if (DEBUG) console.warn('[BeatPass] DOM not ready for bp-notes observer, retrying...');
+            setTimeout(setupMutationObserver, 100);
+            return;
+        }
+        new MutationObserver(re).observe(targetNode, { childList: true, subtree: true });
+        if (DEBUG) console.log('[BeatPass] bp-notes observer setup complete');
+    }
+    setupMutationObserver();
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
     else render();
 

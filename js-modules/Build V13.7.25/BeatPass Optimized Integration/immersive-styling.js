@@ -82,11 +82,23 @@
             observer.disconnect();
         }
         
-        observer = new MutationObserver(onDomChange);
-        observer.observe(document.documentElement, { 
-            childList: true, 
-            subtree: true 
-        });
+        const startObserving = () => {
+            const targetNode = document.body || document.documentElement;
+            if (!targetNode) {
+                console.warn('[BeatPass] DOM not ready for immersive styling observer, retrying...');
+                setTimeout(startObserving, 100);
+                return;
+            }
+            
+            observer = new MutationObserver(onDomChange);
+            observer.observe(targetNode, { 
+                childList: true, 
+                subtree: true 
+            });
+            console.log('[BeatPass] Immersive styling observer setup complete');
+        };
+        
+        startObserving();
     }
 
     // ============================================================
