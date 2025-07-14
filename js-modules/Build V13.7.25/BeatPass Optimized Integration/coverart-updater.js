@@ -409,6 +409,12 @@
     }
 
     async function initUploadPage() {
+        // Early exit if not on upload or edit page
+        if (!isBackstagePage()) {
+            if (DEBUG) console.log("[CoverArtUpdater] Not on upload/edit page, skipping upload page initialization");
+            return;
+        }
+        
         console.log("[CoverArtUpdater] Upload page detected; waiting for genre input...");
         await waitForGenreInputIndefinitely();
         console.log("[CoverArtUpdater] Genre input detected on upload page. Initializing updater.");
@@ -417,6 +423,13 @@
 
     async function initCoverArtUpdater() {
         console.log("[CoverArtUpdater] initCoverArtUpdater invoked.");
+        
+        // Early exit if not on upload or edit page
+        if (!isBackstagePage()) {
+            if (DEBUG) console.log("[CoverArtUpdater] Not on upload/edit page, skipping initialization");
+            return;
+        }
+        
         if (window.location.href.match(/\/backstage\/upload/) && !document.querySelector('input[name="genres"]')) {
             console.log("[CoverArtUpdater] Genre input not present on upload page. Initiating persistent wait.");
             initUploadPage();

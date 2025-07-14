@@ -340,7 +340,21 @@
         }
     }
 
-    // Main navigation handler
+    // Page-specific module detection
+    function isPricingPage() {
+        return window.location.pathname.includes('/pricing') || 
+               window.location.href.includes('/pricing');
+    }
+
+    function shouldLoadPricingEnhancements() {
+        return isPricingPage();
+    }
+
+    function shouldLoadCoverArtUpdater() {
+        return isUploadPage() || isEditPage();
+    }
+
+    // Main navigation handler with targeted module loading
     function handleNavigation(forceInit = false) {
         if (isProcessing && !forceInit) {
             if (DEBUG) console.log('🔄 Navigation already processing, skipping...');
@@ -390,6 +404,8 @@
             if (DEBUG) console.log(`   From: ${currentPath || 'initial'}`);
             if (DEBUG) console.log(`   To: ${newPath}`);
             if (DEBUG) console.log(`   Page type: ${pageType}`);
+            if (DEBUG) console.log(`   Should load pricing: ${shouldLoadPricingEnhancements()}`);
+            if (DEBUG) console.log(`   Should load cover art: ${shouldLoadCoverArtUpdater()}`);
         }
 
         currentPath = newPath;
@@ -397,7 +413,7 @@
         // Wait for DOM to settle before reinitializing
         setTimeout(() => {
             try {
-                // Reinitialize modules based on page type
+                // Reinitialize modules based on page type with targeted loading
                 switch (pageType) {
                     case 'upload':
                     case 'edit':
@@ -406,7 +422,10 @@
                             reinitializeCustomFields();
                             reinitializeBeatPassID();
                             reinitializeSampleSafeBanner();
-                            reinitializeCoverArtUpdater();
+                            // Only load cover art updater on edit/upload pages
+                            if (shouldLoadCoverArtUpdater()) {
+                                reinitializeCoverArtUpdater();
+                            }
                         }, 300);
                         break;
                         
@@ -433,12 +452,16 @@
                         break;
                 }
 
-                // Always reinitialize these modules
+                // Always reinitialize these common modules
                 reinitializeOpenWidget();
                 reinitializeQueueEnhancement();
-                reinitializePricingEnhancements();
                 reinitializeVerifiedProducers();
-                reinitializeUIHelpers();
+                // Skip reinitializeUIHelpers() - UI-helpers handles its own navigation detection
+                
+                // Only load pricing enhancements on pricing pages
+                if (shouldLoadPricingEnhancements()) {
+                    reinitializePricingEnhancements();
+                }
                 
                 if (DEBUG) console.log(`✅ Navigation handling complete for ${pageType} page`);
                 

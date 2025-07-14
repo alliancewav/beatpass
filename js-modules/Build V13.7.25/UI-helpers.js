@@ -2,7 +2,7 @@
 // 8. Subtitle Injection for Various Pages
 // ============================================================
 (function() {
-    const DEBUG = false; // Disabled to reduce console noise
+    const DEBUG = false; // Re-enable debug logging to troubleshoot persistent issue
     // Centralized subtitle manager to prevent conflicts
     let isProcessing = false;
     let currentPath = null;
@@ -67,12 +67,60 @@
     }
 
     // Centralized subtitle manager with enhanced SPA support and debouncing
+    // Enhanced subtitle management with retry capability
+    function manageSubtitlesWithRetry(forceUpdate = false) {
+        const path = normalizePath(window.location.pathname);
+        
+        // Check if page is ready for subtitle injection
+        // Use more flexible h1 selector to match any h1 element
+        const h1 = document.querySelector('h1');
+        const main = document.querySelector('main');
+        const hasContent = document.querySelector('.dashboard-grid-main, [role="main"], main > div, .container, .content');
+        
+        if (!h1 || !main) {
+            if (DEBUG) console.log('Page not ready for subtitles - missing elements:', { h1: !!h1, main: !!main });
+            return false; // Indicate failure
+        }
+        
+        // Call the main subtitle management function
+        manageSubtitles(forceUpdate);
+        return true; // Indicate success
+    }
+    
     function manageSubtitles(forceUpdate = false) {
         const path = normalizePath(window.location.pathname);
         const now = Date.now();
         
-        // Aggressive throttling to prevent performance issues
-        const THROTTLE_DURATION = 1000; // Increased from 300ms to 1000ms
+        if (DEBUG) console.log('manageSubtitles called:', {
+            path,
+            forceUpdate,
+            currentPath,
+            isProcessing,
+            timeSinceLastProcess: now - lastProcessTime
+        });
+        
+        // Check if subtitles already exist for this path (unless forced)
+        if (!forceUpdate) {
+            const existingSubtitles = document.querySelectorAll(
+                "h2[data-latestfeed-subtitle='true'], " +
+                "h2[data-beatpacks-subtitle='true'], " +
+                "h2[data-producers-subtitle='true'], " +
+                "h2[data-trending-subtitle='true'], " +
+                "h2[data-genre-channel-subtitle='true'], " +
+                "h2[data-pricing-subtitle='true'], " +
+                "h2[data-genre-subtitle='true'], " +
+                "p[data-static-subtitle='true'], " +
+                "p[data-genre-subtitle='true']"
+            );
+            
+            if (existingSubtitles.length > 0 && currentPath === path) {
+                if (DEBUG) console.log('Subtitles already exist for path, skipping:', path);
+                return;
+            }
+        }
+        
+        // Balanced throttling to prevent performance issues while maintaining responsiveness
+        const THROTTLE_DURATION = 500; // Reduced from 1000ms for better responsiveness
         
         // Debounce rapid calls to prevent double subtitles
         if (debounceTimeout) {
@@ -81,6 +129,7 @@
         
         // If we just processed recently, throttle aggressively unless forced
         if (!forceUpdate && (now - lastProcessTime) < THROTTLE_DURATION) {
+            if (DEBUG) console.log('Throttling call - too recent');
             // Only allow one debounced call to prevent accumulation
             if (!debounceTimeout) {
                 debounceTimeout = setTimeout(() => {
@@ -92,12 +141,23 @@
         }
         
         // Prevent duplicate processing for same path unless forced
-        if (!forceUpdate && (isProcessing || currentPath === path)) {
+        if (!forceUpdate && currentPath === path && isProcessing) {
+            if (DEBUG) console.log('Skipping duplicate processing for same path:', path);
             return;
         }
         
+        // Prevent processing if already processing same path (even if not forced)
+        if (currentPath === path && isProcessing) {
+            if (DEBUG) console.log('Already processing same path, skipping:', path);
+            return;
+        }
+        
+        // Check if this is a new path navigation
+        const isNewPath = currentPath !== path;
+        
         // Reset processing state for new navigation
-        if (currentPath !== path) {
+        if (isNewPath) {
+            if (DEBUG) console.log('New path detected, resetting state:', currentPath, '->', path);
             isProcessing = false;
             if (processingTimeout) {
                 clearTimeout(processingTimeout);
@@ -105,9 +165,12 @@
             }
         }
         
+        // Update state
         isProcessing = true;
         currentPath = path;
         lastProcessTime = now;
+        
+        if (DEBUG) console.log('Starting subtitle processing for:', path);
         
         // Clear any existing timeout
         if (processingTimeout) {
@@ -118,7 +181,7 @@
             try {
                 if (DEBUG) console.log('Managing subtitles for path:', path);
                  
-                 // Immediately remove any existing subtitles to prevent duplicates
+                 // Smooth transition: fade out existing subtitles before adding new ones
                  const allSubtitleSelector = "h2[data-latestfeed-subtitle='true'], " +
                                            "h2[data-beatpacks-subtitle='true'], " +
                                            "h2[data-producers-subtitle='true'], " +
@@ -131,15 +194,25 @@
                  
                  const existingSubtitles = document.querySelectorAll(allSubtitleSelector);
                  
-                 // Immediately remove existing subtitles without animation to prevent visual glitches
-                 existingSubtitles.forEach(el => {
-                     if (el.parentNode) {
-                         el.remove();
-                     }
-                 });
-                
-                // Small delay to ensure DOM is clean before adding new subtitles
-                 setTimeout(() => {
+                 // Smooth fade-out transition for existing subtitles
+                 if (existingSubtitles.length > 0) {
+                     existingSubtitles.forEach(el => {
+                         if (el.parentNode) {
+                             // Add fade-out class and remove after animation
+                             el.classList.remove('subtitle-fade-in');
+                             el.classList.add('subtitle-fade-out');
+                             
+                             // Remove element after fade-out animation completes
+                             setTimeout(() => {
+                                 if (el.parentNode) {
+                                     el.remove();
+                                 }
+                             }, 150); // Match CSS animation duration (0.15s)
+                         }
+                     });
+                     
+                     // Wait for fade-out to complete before adding new subtitles
+                     setTimeout(() => {
                     try {
                         // First, try to add genre subtitle if this is a genre page
                         let genreSubtitleAdded = false;
@@ -169,21 +242,55 @@
                     } catch (innerError) {
                          console.error('Inner subtitle processing error:', innerError);
                      }
-                 }, 50); // Reduced delay to prevent visual gaps
+                 }, 180); // Wait for fade-out animation to complete (150ms + small buffer)
+                 } else {
+                     // No existing subtitles, add new ones immediately
+                     try {
+                         // First, try to add genre subtitle if this is a genre page
+                         let genreSubtitleAdded = false;
+                         if (isGenrePage()) {
+                             genreSubtitleAdded = addGenreSubtitle();
+                             if (DEBUG) console.log('Genre subtitle attempt result:', genreSubtitleAdded);
+                         }
+                         
+                         // Add H1-based subtitle only if no genre subtitle was added
+                         let mainSubtitleAdded = false;
+                         if (!genreSubtitleAdded) {
+                             if (DEBUG) console.log('Adding H1-based subtitle for path:', path);
+                             mainSubtitleAdded = addSubtitleForPath(path);
+                         } else {
+                             mainSubtitleAdded = true;
+                         }
+                         
+                         // Only add section-based subtitles if no main subtitle was added
+                         // This prevents double subtitles on pages with both main and section content
+                         if (!mainSubtitleAdded) {
+                             if (DEBUG) console.log('Processing section-based subtitles');
+                             addSectionBasedSubtitles();
+                         } else {
+                             if (DEBUG) console.log('Skipping section-based subtitles - main subtitle already added');
+                         }
+                         
+                     } catch (innerError) {
+                         console.error('Inner subtitle processing error:', innerError);
+                     }
+                 }
                 
             } catch (error) {
                 console.error('Subtitle management error:', error);
             } finally {
-                // Reset processing state after a delay to allow for retries
+                // Reset processing state after a longer delay to prevent race conditions
                 setTimeout(() => {
                     isProcessing = false;
-                }, 200);
+                    if (DEBUG) console.log('Processing state reset for path:', path);
+                }, 1000); // Increased to 1000ms to prevent race conditions and flashing
             }
         }, 100);
     }
 
     function addSubtitleForPath(path) {
-        const h1 = document.querySelector("h1.text-3xl");
+        // Use flexible h1 selector to match any h1 element
+        const h1 = document.querySelector("h1");
         if (!h1) return false;
         
         let subtitleText = "";
@@ -352,7 +459,8 @@
     function addGenreSubtitle() {
         if (!isGenrePage()) return false;
         
-        const h1 = document.querySelector("h1.text-3xl");
+        // Use flexible h1 selector to match any h1 element
+        const h1 = document.querySelector("h1");
         if (!h1) return false;
         
         const slug = window.location.pathname.split("/").filter(Boolean).pop() || "";
@@ -420,8 +528,7 @@
             // Function to attempt subtitle management
             function attemptSubtitles() {
                 if (isPageReady()) {
-                    manageSubtitles();
-                    return true;
+                    return manageSubtitlesWithRetry(true);
                 }
                 return false;
             }
@@ -463,6 +570,42 @@
                     if (mutation.type === 'childList') {
                         const target = mutation.target;
                         
+                        // Skip mutations related to subtitle elements to prevent infinite loops
+                        const isSubtitleMutation = Array.from(mutation.addedNodes).some(node => 
+                            node.nodeType === 1 && (
+                                node.matches && (
+                                    node.matches('h2[data-latestfeed-subtitle="true"]') ||
+                                    node.matches('h2[data-beatpacks-subtitle="true"]') ||
+                                    node.matches('h2[data-producers-subtitle="true"]') ||
+                                    node.matches('h2[data-trending-subtitle="true"]') ||
+                                    node.matches('h2[data-genre-channel-subtitle="true"]') ||
+                                    node.matches('h2[data-pricing-subtitle="true"]') ||
+                                    node.matches('h2[data-genre-subtitle="true"]') ||
+                                    node.matches('p[data-static-subtitle="true"]') ||
+                                    node.matches('p[data-genre-subtitle="true"]')
+                                )
+                            )
+                        ) || Array.from(mutation.removedNodes).some(node => 
+                            node.nodeType === 1 && (
+                                node.matches && (
+                                    node.matches('h2[data-latestfeed-subtitle="true"]') ||
+                                    node.matches('h2[data-beatpacks-subtitle="true"]') ||
+                                    node.matches('h2[data-producers-subtitle="true"]') ||
+                                    node.matches('h2[data-trending-subtitle="true"]') ||
+                                    node.matches('h2[data-genre-channel-subtitle="true"]') ||
+                                    node.matches('h2[data-pricing-subtitle="true"]') ||
+                                    node.matches('h2[data-genre-subtitle="true"]') ||
+                                    node.matches('p[data-static-subtitle="true"]') ||
+                                    node.matches('p[data-genre-subtitle="true"]')
+                                )
+                            )
+                        );
+                        
+                        if (isSubtitleMutation) {
+                            if (DEBUG) console.log('Ignoring subtitle-related mutation to prevent infinite loop');
+                            return; // Skip this mutation
+                        }
+                        
                         // Check for significant DOM changes that indicate navigation
                         if (target.matches && (
                             target.matches('main') ||
@@ -478,8 +621,8 @@
                             // Check if h1 was added (not just any change)
                             if (Array.from(mutation.addedNodes).some(node => 
                                 node.nodeType === 1 && (
-                                    node.matches('h1.text-3xl') ||
-                                    node.querySelector('h1.text-3xl')
+                                    node.matches('h1') ||
+                                    node.querySelector('h1')
                                 )
                             )) {
                                 hasSignificantChange = true;
@@ -489,8 +632,8 @@
                         // Only watch for h1 additions, not all changes
                         if (Array.from(mutation.addedNodes).some(node => 
                             node.nodeType === 1 && (
-                                node.matches('h1.text-3xl') ||
-                                node.querySelector('h1.text-3xl')
+                                node.matches('h1') ||
+                                node.querySelector('h1')
                             )
                         )) {
                             shouldUpdate = true;
@@ -500,13 +643,36 @@
                 });
                 
                 if (shouldUpdate) {
+                    // Check if subtitles already exist for current path to prevent redundant processing
+                    const currentPagePath = normalizePath(window.location.pathname);
+                    const existingSubtitles = document.querySelectorAll(
+                        "h2[data-latestfeed-subtitle='true'], " +
+                        "h2[data-beatpacks-subtitle='true'], " +
+                        "h2[data-producers-subtitle='true'], " +
+                        "h2[data-trending-subtitle='true'], " +
+                        "h2[data-genre-channel-subtitle='true'], " +
+                        "h2[data-pricing-subtitle='true'], " +
+                        "h2[data-genre-subtitle='true'], " +
+                        "p[data-static-subtitle='true'], " +
+                        "p[data-genre-subtitle='true']"
+                    );
+                    
+                    // Skip if subtitles already exist and we're on the same path
+                    if (existingSubtitles.length > 0 && currentPath === currentPagePath) {
+                        if (DEBUG) console.log('Mutation observer: subtitles already exist for path:', currentPagePath);
+                        return;
+                    }
+                    
                     // Use separate debounce for mutation observer to prevent conflicts
                     if (mutationDebounceTimeout) {
                         clearTimeout(mutationDebounceTimeout);
                     }
                     mutationDebounceTimeout = setTimeout(() => {
-                        manageSubtitles(hasSignificantChange);
-                    }, hasSignificantChange ? 500 : 800); // Increased delays to reduce frequency
+                        if (!manageSubtitlesWithRetry(hasSignificantChange)) {
+                            // Retry if failed
+                            setTimeout(() => manageSubtitlesWithRetry(hasSignificantChange), 150);
+                        }
+                    }, hasSignificantChange ? 200 : 400); // Reduced delays for better responsiveness
                 }
             });
             
@@ -534,10 +700,39 @@
             const originalReplaceState = history.replaceState;
             
             function handleNavigation(eventType) {
-                if (DEBUG) console.log('Navigation detected:', eventType, window.location.pathname);
-                // Reset state on navigation
+                const newPath = normalizePath(window.location.pathname);
+                if (DEBUG) console.log('Navigation detected:', eventType, newPath);
+                
+                // Only process if path actually changed
+                if (currentPath === newPath) {
+                    if (DEBUG) console.log('Navigation ignored - same path:', newPath);
+                    return;
+                }
+                
+                // Immediately remove existing subtitles to prevent flicker
+                const allSubtitleSelector = "h2[data-latestfeed-subtitle='true'], " +
+                                          "h2[data-beatpacks-subtitle='true'], " +
+                                          "h2[data-producers-subtitle='true'], " +
+                                          "h2[data-trending-subtitle='true'], " +
+                                          "h2[data-genre-channel-subtitle='true'], " +
+                                          "h2[data-pricing-subtitle='true'], " +
+                                          "h2[data-genre-subtitle='true'], " +
+                                          "p[data-static-subtitle='true'], " +
+                                          "p[data-genre-subtitle='true']";
+                
+                const existingSubtitles = document.querySelectorAll(allSubtitleSelector);
+                existingSubtitles.forEach(el => {
+                    if (el.parentNode) {
+                        el.remove();
+                    }
+                });
+                
+                if (DEBUG && existingSubtitles.length > 0) {
+                    console.log('Immediately removed', existingSubtitles.length, 'existing subtitles on navigation');
+                }
+                
+                // Reset processing state for new navigation
                 isProcessing = false;
-                currentPath = null;
                 if (processingTimeout) {
                     clearTimeout(processingTimeout);
                     processingTimeout = null;
@@ -548,8 +743,38 @@
                     clearTimeout(debounceTimeout);
                 }
                 
-                // Single attempt with debouncing for SPA navigation
-                debounceTimeout = setTimeout(() => manageSubtitles(true), 250);
+                // Update periodic check tracking to prevent redundant processing
+                if (typeof window.updateLastSubtitleTime === 'function') {
+                    window.updateLastSubtitleTime();
+                }
+                
+                // Enhanced navigation handling with retry mechanism
+                debounceTimeout = setTimeout(() => {
+                    // Try immediate injection
+                    if (manageSubtitlesWithRetry(true)) {
+                        // Success - update periodic check tracking to prevent redundant processing
+                        if (typeof window.updateLastSubtitleTime === 'function') {
+                            window.updateLastSubtitleTime();
+                        }
+                    } else {
+                        // If failed, retry with progressive delays
+                        setTimeout(() => {
+                            if (manageSubtitlesWithRetry(true) && typeof window.updateLastSubtitleTime === 'function') {
+                                window.updateLastSubtitleTime();
+                            }
+                        }, 100);
+                        setTimeout(() => {
+                            if (manageSubtitlesWithRetry(true) && typeof window.updateLastSubtitleTime === 'function') {
+                                window.updateLastSubtitleTime();
+                            }
+                        }, 300);
+                        setTimeout(() => {
+                            if (manageSubtitlesWithRetry(true) && typeof window.updateLastSubtitleTime === 'function') {
+                                window.updateLastSubtitleTime();
+                            }
+                        }, 600);
+                    }
+                }, 150);
             }
             
             history.pushState = function(...args) {
@@ -591,9 +816,15 @@
             let lastKnownH1Text = '';
             let lastSubtitleUpdateTime = 0;
             
+            // Make lastSubtitleUpdateTime accessible to navigation handler
+            window.updateLastSubtitleTime = () => {
+                lastSubtitleUpdateTime = Date.now();
+            };
+            
             setInterval(() => {
                 const currentPagePath = window.location.pathname;
-                const h1 = document.querySelector('h1.text-3xl');
+                // Use flexible h1 selector to match any h1 element
+                const h1 = document.querySelector('h1');
                 const currentH1Text = h1 ? h1.textContent.trim() : '';
                 const now = Date.now();
                 
@@ -602,34 +833,85 @@
                 
                 // Much more aggressive throttling - only allow updates if significant time has passed
                 const timeSinceLastUpdate = now - lastSubtitleUpdateTime;
-                const shouldUpdate = pathChanged && timeSinceLastUpdate > 3000; // Increased from 2000ms to 3000ms
+                const timeSinceLastProcess = now - lastProcessTime;
+                
+                // Don't process if:
+                // 1. Path hasn't changed
+                // 2. Not enough time since last update (increased to 5 seconds)
+                // 3. Current path matches what we're already tracking (avoid redundant processing)
+                // 4. Recent processing activity (within 3 seconds)
+                // 5. Currently processing
+                const shouldUpdate = pathChanged && 
+                                   timeSinceLastUpdate > 5000 && 
+                                   currentPagePath !== currentPath && 
+                                   timeSinceLastProcess > 3000 &&
+                                   !isProcessing;
                 
                 if (shouldUpdate) {
                     if (DEBUG) console.log('Periodic check detected path change:', {
                         oldPath: lastKnownPath,
                         newPath: currentPagePath,
-                        timeSinceLastUpdate: timeSinceLastUpdate
+                        timeSinceLastUpdate: timeSinceLastUpdate,
+                        timeSinceLastProcess: timeSinceLastProcess
                     });
+                    
+                    // Immediately remove existing subtitles to prevent flicker
+                    const allSubtitleSelector = "h2[data-latestfeed-subtitle='true'], " +
+                                              "h2[data-beatpacks-subtitle='true'], " +
+                                              "h2[data-producers-subtitle='true'], " +
+                                              "h2[data-trending-subtitle='true'], " +
+                                              "h2[data-genre-channel-subtitle='true'], " +
+                                              "h2[data-pricing-subtitle='true'], " +
+                                              "h2[data-genre-subtitle='true'], " +
+                                              "p[data-static-subtitle='true'], " +
+                                              "p[data-genre-subtitle='true']";
+                    
+                    const existingSubtitles = document.querySelectorAll(allSubtitleSelector);
+                    existingSubtitles.forEach(el => {
+                        if (el.parentNode) {
+                            el.remove();
+                        }
+                    });
+                    
+                    if (DEBUG && existingSubtitles.length > 0) {
+                        console.log('Periodic check removed', existingSubtitles.length, 'existing subtitles');
+                    }
                     
                     lastKnownPath = currentPagePath;
                     lastKnownH1Text = currentH1Text;
                     lastSubtitleUpdateTime = now;
                     
-                    // Reset state and debounced update
+                    // Reset processing state and debounced update
                     isProcessing = false;
-                    currentPath = null;
                     
                     // Clear existing debounce and set new one
                     if (debounceTimeout) {
                         clearTimeout(debounceTimeout);
                     }
-                    debounceTimeout = setTimeout(() => manageSubtitles(true), 300);
+                    debounceTimeout = setTimeout(() => {
+                        if (manageSubtitlesWithRetry(true)) {
+                            // Success - update tracking
+                            lastSubtitleUpdateTime = now;
+                        } else {
+                            // Retry if failed
+                            setTimeout(() => {
+                                if (manageSubtitlesWithRetry(true)) {
+                                    lastSubtitleUpdateTime = Date.now();
+                                }
+                            }, 200);
+                            setTimeout(() => {
+                                if (manageSubtitlesWithRetry(true)) {
+                                    lastSubtitleUpdateTime = Date.now();
+                                }
+                            }, 500);
+                        }
+                    }, 200);
                 } else if (pathChanged) {
                     // Update tracking variables even if we don't process
                     lastKnownPath = currentPagePath;
                     lastKnownH1Text = currentH1Text;
                 }
-            }, 2500); // Reduced frequency from 1500ms to 2500ms
+            }, 4000); // Increased frequency to 4000ms to reduce interference with navigation events
         }
         
         // Use UIHelpersInitManager for load events if available, otherwise fallback
@@ -641,8 +923,9 @@
                 setTimeout(() => {
                     if (!attemptSubtitles()) {
                         // If still failing after window load, try more aggressively
-                        setTimeout(() => manageSubtitles(), 200);
-                        setTimeout(() => manageSubtitles(), 500);
+                        setTimeout(() => manageSubtitlesWithRetry(true), 200);
+                        setTimeout(() => manageSubtitlesWithRetry(true), 500);
+                        setTimeout(() => manageSubtitlesWithRetry(true), 1000);
                     }
                 }, 100);
             });
@@ -662,11 +945,17 @@
 
     // Expose global initialization function for SPA routing
     window.initUIHelpers = function() {
-        if (DEBUG) console.log('[UI Helpers] Re-initializing for SPA navigation...');
+        const newPath = normalizePath(window.location.pathname);
+        if (DEBUG) console.log('[UI Helpers] Re-initializing for SPA navigation...', newPath);
+        
+        // Only process if path actually changed
+        if (currentPath === newPath) {
+            if (DEBUG) console.log('[UI Helpers] Skipping re-init - same path:', newPath);
+            return;
+        }
         
         // Reset processing state
         isProcessing = false;
-        currentPath = null;
         if (processingTimeout) {
             clearTimeout(processingTimeout);
             processingTimeout = null;
@@ -676,9 +965,31 @@
             debounceTimeout = null;
         }
         
-        // Force subtitle management
+        // Force subtitle management with retry
         setTimeout(() => {
-            manageSubtitles(true);
+            if (manageSubtitlesWithRetry(true)) {
+                // Success - update periodic check tracking
+                if (typeof window.updateLastSubtitleTime === 'function') {
+                    window.updateLastSubtitleTime();
+                }
+            } else {
+                // Retry if failed
+                setTimeout(() => {
+                    if (manageSubtitlesWithRetry(true) && typeof window.updateLastSubtitleTime === 'function') {
+                        window.updateLastSubtitleTime();
+                    }
+                }, 150);
+                setTimeout(() => {
+                    if (manageSubtitlesWithRetry(true) && typeof window.updateLastSubtitleTime === 'function') {
+                        window.updateLastSubtitleTime();
+                    }
+                }, 400);
+                setTimeout(() => {
+                    if (manageSubtitlesWithRetry(true) && typeof window.updateLastSubtitleTime === 'function') {
+                        window.updateLastSubtitleTime();
+                    }
+                }, 800);
+            }
         }, 100);
     };
 

@@ -15,6 +15,13 @@
     
     // Use window directly for better performance
     const globalObj = window;
+    
+    // Page detection utility
+    function isOnPricingPage() {
+        const currentUrl = window.location.href;
+        const currentPath = window.location.pathname;
+        return currentUrl.includes('/pricing') || currentPath.includes('/pricing');
+    }
 
     // Centralized Initialization State Manager
     const InitializationManager = {
@@ -199,9 +206,7 @@
         }
     }
 
-    function isOnPricingPage() {
-        return window.location.href === TARGET_URL;
-    }
+    // Removed duplicate - using the enhanced version defined above
     
     // Cache DOM queries
     function getCachedElement(selector) {
@@ -8762,12 +8767,21 @@
     // Initialize the system
     function initialize() {
         try {
+            // Early exit if not on pricing page
+            if (!isOnPricingPage()) {
+                log('Not on pricing page, skipping pricing enhancements initialization');
+                return;
+            }
+            
             log('BeatPass Pricing Enhancement initializing...');
             
             // Use the new InitializationManager
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => {
-                    InitializationManager.init();
+                    // Double-check page before initializing
+                    if (isOnPricingPage()) {
+                        InitializationManager.init();
+                    }
                 });
             } else {
                 InitializationManager.init();
