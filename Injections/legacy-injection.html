@@ -1,0 +1,164 @@
+<script>
+    (function() {
+        'use strict';
+        const c = {
+            activeSystem: 'legacy', timeout: 15000, retries: 2, delay: 500, legacyPath: './js-modules/legacy/', v1Path: './js-modules/v1/', cache: Date.now()};
+        const p = {
+            start: performance.now(), loaded: 0, failed: 0, mark: l=>performance.mark(`bp-${l}`), time: ()=>Math.round(performance.now()-p.start)};
+        class L {
+            constructor() {
+                this.loaded = new Set(); this.loading = new Map();
+            }
+            async load(src, name) {
+                if (this.loading.has(src))return this.loading.get(src);
+                if (this.loaded.has(src))return;
+                const promise = this._retry(src, name);
+                this.loading.set(src, promise);
+                try {
+                    await promise; this.loaded.add(src); p.loaded++;
+                }catch(e) {
+                    p.failed++; throw e;
+                }finally {
+                    this.loading.delete(src);
+                }
+            }
+            async _retry(src, name) {
+                let err;
+                for (let i = 1; i <= c.retries+1; i++) {
+                    try {
+                        await this._create(src); return;
+                    }catch(e) {
+                        err = e; if (i <= c.retries)await new Promise(r => setTimeout(r, c.delay*i));
+                    }
+                }
+                throw new Error(`Failed: ${name} - ${err.message}`);
+            }
+            _create(src) {
+                return new Promise((resolve, reject)=> {
+                    const s = document.createElement('script');
+                    s.src = src; s.defer = true;
+                    const t = setTimeout(()=>reject(new Error('Timeout')), c.timeout);
+                    s.onload = ()=> {
+                        clearTimeout(t); resolve();
+                    };
+                    s.onerror = ()=> {
+                        clearTimeout(t); reject(new Error('Load error'));
+                    };
+                    document.head.appendChild(s);
+                });
+            }
+        }
+        const systems = {
+            legacy: {
+                files: ['UI-helpers.js',
+                    'BeatpassOptimizedIntegration.js',
+                    'custom-fields.js',
+                    'pricing-enhancements.js',
+                    'verified-producers.js',
+                    'bp-notes.js',
+                    'cd-spin.js',
+                    'queue-enhancement.js'],
+                path: c.legacyPath,
+                event: 'beatpassSystemReady',
+                ready: ()=> {
+                    const checks = [typeof window.initSubtitles === 'function',
+                        typeof window.robustInitialize === 'function' || typeof window.initCustomFields === 'function',
+                        window.queueEnhancement && typeof window.queueEnhancement.isInitialized === 'function',
+                        window.BeatPassPricingCarousel && (window.BeatPassPricingCarousel.isInitialized || typeof window.BeatPassPricingCarousel.isInitialized === 'function'),
+                        typeof window.saveToCache === 'function' || typeof window.renderBadges === 'function',
+                        typeof window.robustInitialize === 'function' || typeof window.initTrackPage === 'function']; return checks.filter(Boolean).length >= 4;
+                }},
+            v1: {
+                files: ['module-loader.js'],
+                path: c.v1Path,
+                event: 'beatpass:ready',
+                ready: ()=>window.BeatPass && Object.keys(window.BeatPass).length > 0
+            }
+        };
+        class S {
+            constructor() {
+                this.loader = new L(); this.ready = false;
+            }
+            async load(key) {
+                const sys = systems[key];
+                if (!sys)throw new Error(`Unknown: ${key}`);
+                p.mark('start');
+                const results = {
+                    system: key,
+                    total: sys.files.length,
+                    loaded: 0,
+                    failed: []};
+                for (const file of sys.files) {
+                    try {
+                        await this.loader.load(`${sys.path}${file}?v=${c.cache}`, file); results.loaded++;
+                    }catch(e) {
+                        results.failed.push({
+                            file, error: e.message
+                        });
+                    }
+                }
+                if (results.loaded > 0) {
+                    await this._wait(sys);
+                    if (key === 'legacy')window.BeatpassSystemUsed = 'legacy-only';
+                }
+                window.BeatpassSystemUsed = key;
+                window.BeatpassLoadResults = results;
+                return results;
+            }
+            async _wait(sys) {
+                return new Promise((resolve, reject)=> {
+                    const start = Date.now();
+                    const check = ()=> {
+                        if (sys.ready()) {
+                            this.ready = true; resolve(); return;
+                        }
+                        if (Date.now()-start > 15000) {
+                            reject(new Error('Timeout')); return;
+                        }
+                        setTimeout(check, 200);
+                    };
+                    const handler = ()=> {
+                        this.ready = true; window.removeEventListener(sys.event, handler); resolve();
+                    };
+                    window.addEventListener(sys.event, handler, {
+                        once: true
+                    });
+                    check();
+                });
+            }
+        }
+        window.BeatpassSystemStatus = {
+            getActiveSystem: ()=>c.activeSystem,
+            getCurrentSystem: ()=>window.BeatpassSystemUsed || null,
+            getLoadResults: ()=>window.BeatpassLoadResults || null,
+            isReady: ()=>loader?.ready || false,
+            switchToLegacy: ()=> {
+                localStorage.setItem('beatpass-preferred-system',
+                    'legacy'); location.reload();
+            },
+            switchToV1: ()=> {
+                localStorage.setItem('beatpass-preferred-system',
+                    'v1'); location.reload();
+            },
+            reload: ()=>location.reload(),
+            clearCache: ()=>localStorage.removeItem('beatpass-preferred-system')
+        };
+        const loader = new S();
+        (async()=> {
+            try {
+                const pref = localStorage.getItem('beatpass-preferred-system');
+                if (pref && systems[pref])c.activeSystem = pref;
+                const results = await loader.load(c.activeSystem);
+                window.dispatchEvent(new CustomEvent('beatpass:system-ready', {
+                    detail: {
+                        system: c.activeSystem, results, performance: {
+                            loaded: p.loaded, failed: p.failed, time: p.time()}}}));
+            }catch(e) {
+                window.dispatchEvent(new CustomEvent('beatpass:system-error', {
+                    detail: {
+                        error: e.message
+                    }}));
+            }
+        })();
+    })();
+</script>

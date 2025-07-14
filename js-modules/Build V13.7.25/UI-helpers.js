@@ -645,6 +645,28 @@
         }
     }
 
+    // Expose global initialization function for SPA routing
+    window.initUIHelpers = function() {
+        console.log('[UI Helpers] Re-initializing for SPA navigation...');
+        
+        // Reset processing state
+        isProcessing = false;
+        currentPath = null;
+        if (processingTimeout) {
+            clearTimeout(processingTimeout);
+            processingTimeout = null;
+        }
+        if (debounceTimeout) {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = null;
+        }
+        
+        // Force subtitle management
+        setTimeout(() => {
+            manageSubtitles(true);
+        }, 100);
+    };
+
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", initSubtitles);
     } else {

@@ -3081,6 +3081,113 @@
     }
 })();
 
+// ============================================================
+// BP Notes Initialization Manager
+// ============================================================
+window.BPNotesInitManager = {
+    initialized: false,
+    initializing: false,
+    state: {
+        lastRenderState: { id: null, msg: null, editable: null }
+    },
+    
+    init() {
+        if (this.initialized || this.initializing) {
+            console.log('[BP] BPNotesInitManager: Already initialized or initializing');
+            return Promise.resolve();
+        }
+        
+        this.initializing = true;
+        console.log('[BP] BPNotesInitManager: Starting initialization');
+        
+        try {
+            // Initialize core functions
+            if (typeof render === 'function') {
+                render();
+            }
+            if (typeof robustInitialize === 'function') {
+                robustInitialize();
+            }
+            
+            // Load required libraries if not present
+            this.loadRequiredLibraries();
+            
+            // Inject required styles
+            this.injectStyles();
+            
+            this.initialized = true;
+            this.initializing = false;
+            console.log('[BP] BPNotesInitManager: Initialization completed');
+            
+            return Promise.resolve();
+        } catch (error) {
+            this.initializing = false;
+            console.error('[BP] BPNotesInitManager: Initialization failed:', error);
+            return Promise.reject(error);
+        }
+    },
+    
+    loadRequiredLibraries() {
+        // Load Quill if not already loaded
+        if (!window.Quill) {
+            const quillScript = document.createElement('script');
+            quillScript.src = 'https://cdn.quilljs.com/1.3.7/quill.min.js';
+            document.head.appendChild(quillScript);
+            const quillStyle = document.createElement('link');
+            quillStyle.rel = 'stylesheet';
+            quillStyle.href = 'https://cdn.quilljs.com/1.3.7/quill.snow.css';
+            document.head.appendChild(quillStyle);
+        }
+        
+        // Load DOMPurify if not already loaded
+        if (!window.DOMPurify) {
+            const purifyScript = document.createElement('script');
+            purifyScript.src = 'https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js';
+            document.head.appendChild(purifyScript);
+        }
+    },
+    
+    injectStyles() {
+        // Add the keyframes for animations if not present
+        if (!document.getElementById('bp-animation-keyframes')) {
+            const style = document.createElement('style');
+            style.id = 'bp-animation-keyframes';
+            style.textContent = `
+                @keyframes bp-gradient-ring-pan { 
+                    0% { background-position: 0% 50%; } 
+                    100% { background-position: 100% 50%; } 
+                }
+                @keyframes fadeInUp {
+                    0% {
+                        opacity: 0;
+                        transform: translateY(20px) scale(0.95);
+                    }
+                    100% {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+                @keyframes bp-gradient-pan {
+                    0% { background-position: 0% 50%; }
+                    100% { background-position: 100% 50%; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    },
+    
+    isInitialized() {
+        return this.initialized;
+    },
+    
+    getState() {
+        return {
+            isInitialized: this.initialized,
+            isInitializing: this.initializing
+        };
+    }
+};
+
 // Simplified initialization - delegates to BPNotesInitManager
 function bpInitAll() {
     console.log('[BP] bpInitAll() called - delegating to BPNotesInitManager');
@@ -3131,51 +3238,6 @@ function getFirstGradientColor(gradient) {
 
 
 // CSS injection and library loading is now handled by BPNotesInitManager
-// Keeping this as fallback for backward compatibility
-if (!window.BPNotesInitManager) {
-    // Add the keyframes for animations if not present
-    if (!document.getElementById('bp-animation-keyframes')) {
-        const style = document.createElement('style');
-        style.id = 'bp-animation-keyframes';
-        style.textContent = `
-            @keyframes bp-gradient-ring-pan { 
-                0% { background-position: 0% 50%; } 
-                100% { background-position: 100% 50%; } 
-            }
-            @keyframes fadeInUp {
-                0% {
-                    opacity: 0;
-                    transform: translateY(20px) scale(0.95);
-                }
-                100% {
-                    opacity: 1;
-                    transform: translateY(0) scale(1);
-                }
-            }
-            @keyframes bp-gradient-pan {
-                0% { background-position: 0% 50%; }
-                100% { background-position: 100% 50%; }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    // Load Quill and DOMPurify if not already loaded
-    if (!window.Quill) {
-        const quillScript = document.createElement('script');
-        quillScript.src = 'https://cdn.quilljs.com/1.3.7/quill.min.js';
-        document.head.appendChild(quillScript);
-        const quillStyle = document.createElement('link');
-        quillStyle.rel = 'stylesheet';
-        quillStyle.href = 'https://cdn.quilljs.com/1.3.7/quill.snow.css';
-        document.head.appendChild(quillStyle);
-    }
-    if (!window.DOMPurify) {
-        const purifyScript = document.createElement('script');
-        purifyScript.src = 'https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js';
-        document.head.appendChild(purifyScript);
-    }
-}
 
 // Debounce utility - kept for backward compatibility
 function debounceBP(fn, delay) {
@@ -3187,9 +3249,6 @@ function debounceBP(fn, delay) {
 }
 
 // Resize event handling is now managed by BPNotesInitManager
-// Keeping this as fallback for backward compatibility
-if (!window.BPNotesInitManager) {
-    window.addEventListener('resize', debounceBP(() => {
-        if (typeof render === 'function') render();
-    }, 300));
-}
+window.addEventListener('resize', debounceBP(() => {
+    if (typeof render === 'function') render();
+}, 300));

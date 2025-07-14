@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Producer and Tags Manager - Standalone IIFE Module
  * Handles producer and tag data extraction, chip creation, and restoration
  * Zero dependencies - all utilities embedded
@@ -874,6 +874,85 @@
     }
 
     // ---------------------------
+    // Auto-Save Functionality
+    // ---------------------------
+    let autoSaveTimeout = null;
+    
+    function debouncedAutoSave() {
+        if (autoSaveTimeout) {
+            clearTimeout(autoSaveTimeout);
+        }
+        
+        autoSaveTimeout = setTimeout(async () => {
+            // Enhanced validation for core functions and edit page state
+            const coreReady = window.getTrackId && window.getTrackName && window.isEditPage;
+            const isEdit = window.isEditPage && window.isEditPage();
+            
+            if (!coreReady) {
+                console.warn('⚠️ Auto-save skipped - core functions not ready:', {
+                    getTrackId: !!window.getTrackId,
+                    getTrackName: !!window.getTrackName,
+                    isEditPage: !!window.isEditPage
+                });
+                return;
+            }
+            
+            if (isEdit) {
+                const trackId = window.getTrackId();
+                console.log('🔄 Auto-save triggered - Track ID:', trackId, 'Edit page:', isEdit);
+                console.log('🔍 getTrackId function available:', typeof window.getTrackId);
+                console.log('🔍 Current URL:', window.location.pathname);
+                
+                if (trackId) {
+                    console.log('💾 Starting auto-save process...');
+                    
+                    const key_name = document.getElementById('key_name')?.value.trim() || '';
+                    const scale = document.getElementById('scale')?.value.trim() || '';
+                    const bpm = document.getElementById('bpm')?.value.trim() || '';
+                    const track_name = window.getTrackName ? window.getTrackName() : '';
+                    const duration_ms = window.getDuration ? window.getDuration() : null;
+                    const producers = window.getProducers ? window.getProducers() : '';
+                    const tags = window.getTags ? window.getTags() : '';
+                    
+                    console.log('📊 Field values:', { key_name, scale, bpm, track_name, duration_ms, producers, tags });
+                    
+                    // Get exclusive licensing data
+                    const licensingData = getExclusiveLicensingData();
+                    
+                    const autoSaveData = {
+                        key_name,
+                        scale,
+                        bpm,
+                        track_name: track_name || '',
+                        track_id: trackId,
+                        duration_ms,
+                        producers: producers || '',
+                        tags: tags || '',
+                        licensing_type: licensingData.licensing_type,
+                        exclusive_price: licensingData.licensing_type !== 'non_exclusive_only' ? licensingData.exclusive_price : '',
+                        exclusive_currency: licensingData.exclusive_currency,
+                        exclusive_status: licensingData.licensing_type === 'non_exclusive_only' ? 'not_available' : licensingData.exclusive_status,
+                        exclusive_buyer_info: licensingData.exclusive_buyer_info
+                    };
+                    
+                    console.log('📤 Auto-save data prepared:', autoSaveData);
+                    
+                    const success = await submitCustomData(autoSaveData);
+                    if (success) {
+                        console.log('✅ Auto-save completed successfully');
+                    } else {
+                        console.error('❌ Auto-save failed');
+                    }
+                } else {
+                    console.warn('⚠️ Auto-save skipped - no track ID available');
+                }
+            } else {
+                console.log('ℹ️ Auto-save skipped - not on edit page');
+            }
+        }, 1000); // 1 second delay
+    }
+    
+    // ---------------------------
     // Data Submission
     // ---------------------------
     async function submitCustomData(pendingData) {
@@ -886,13 +965,13 @@
             key_name = document.getElementById('key_name')?.value.trim() || '';
             scale = document.getElementById('scale')?.value.trim() || '';
             bpm = document.getElementById('bpm')?.value.trim() || '';
-            track_name = getTrackName();
-            duration_ms = getDuration();
-            producers = getProducers();
-            tags = getTags();
+            track_name = window.getTrackName ? window.getTrackName() : '';
+            duration_ms = window.getDuration ? window.getDuration() : null;
+            producers = window.getProducers ? window.getProducers() : '';
+            tags = window.getTags ? window.getTags() : '';
             
             // Get playback URL from the input field if we're on the edit page
-            if (isEditPage()) {
+            if (window.isEditPage && window.isEditPage()) {
                 const playbackInput = document.querySelector('input[name="src"]');
                 if (playbackInput) {
                     playback_url = playbackInput.value.trim();
@@ -961,16 +1040,35 @@
         if (DEBUG) console.log("ðŸ“¤ Final payload for submission:", payload);
 
         try {
+            console.log('🌐 Making API request to:', API_URL);
+            console.log('📦 Request payload:', payload);
+            
             const res = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams(payload)
             });
+            
+            console.log('📡 Response status:', res.status, res.statusText);
+            
+            if (!res.ok) {
+                console.error('❌ HTTP error:', res.status, res.statusText);
+                return false;
+            }
+            
             const data = await res.json();
-            localStorage.removeItem('pendingCustomData');
-            return true;
+            console.log('📥 API response:', data);
+            
+            if (data.status === 'success') {
+                localStorage.removeItem('pendingCustomData');
+                console.log('✅ Data submitted successfully to database');
+                return true;
+            } else {
+                console.error('❌ API returned error:', data.message || 'Unknown error');
+                return false;
+            }
         } catch (err) {
-            console.error("Error submitting custom data:", err);
+            console.error("❌ Network error submitting custom data:", err);
             return false;
         }
     }
@@ -1295,6 +1393,7 @@
     window.submitCustomData = submitCustomData;
     window.processPendingCustomDataOnConfirmation = processPendingCustomDataOnConfirmation;
     window.handleFormSubmission = handleFormSubmission;
+    window.debouncedAutoSave = debouncedAutoSave;
 
     // Auto-initialization
     if (document.readyState === 'loading') {
@@ -1492,58 +1591,78 @@
     // ---------------------------
 
     function createFingerprintDashboard() {
+        // Remove any existing dashboard
+        removeFingerprintDashboard();
+        
         const dashboard = document.createElement('div');
         dashboard.id = 'fingerprint-dashboard';
-        dashboard.className = 'fingerprint-dashboard mt-16 mb-16';
+        dashboard.className = 'mb-24 text-sm'; // Use native form field spacing
+        
+        // Start invisible to prevent flash
         dashboard.style.cssText = `
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%);
-            border: 1px solid rgba(59, 130, 246, 0.15);
-            border-radius: 12px;
-            padding: 20px;
-            position: relative;
-            overflow: hidden;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.4s ease-out, transform 0.4s ease-out;
         `;
         
-        // Header
+        // Create main container using native form styling patterns
+        const mainCard = document.createElement('div');
+        mainCard.className = 'isolate relative'; // Native isolate pattern
+        
+        const innerCard = document.createElement('div');
+        innerCard.className = 'block relative w-full bg-transparent rounded-input border-divider border shadow-sm p-16';
+        innerCard.style.cssText = `
+            background: rgba(37, 37, 37, 0.6);
+            backdrop-filter: blur(15px);
+            border-color: rgba(255, 255, 255, 0.15);
+        `;
+        
+        // Add mobile-responsive class
+        innerCard.classList.add('beatpass-id-mobile-responsive');
+        
+        // Header section using native typography
         const header = document.createElement('div');
-        header.className = 'flex items-center gap-12 mb-16';
+        header.className = 'flex items-center justify-between mb-12';
         
-        const icon = document.createElement('div');
-        icon.className = 'flex items-center justify-center w-10 h-10 rounded-full';
-        icon.style.cssText = `
-            background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        `;
-        icon.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                <path d="M12 1L3 5V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V5L12 1M12 7C13.4 7 14.8 8.6 14.8 10V11H15.5V16H8.5V11H9.2V10C9.2 8.6 10.6 7 12 7M12 8.2C11.2 8.2 10.5 8.7 10.5 10V11H13.5V10C13.5 8.7 12.8 8.2 12 8.2Z"/>
-            </svg>
-        `;
+        const headerLeft = document.createElement('div');
+        headerLeft.className = 'flex items-center gap-8';
         
-        const title = document.createElement('h4');
-        title.className = 'font-bold text-white text-lg';
+        // Fingerprint icon using native icon styling
+        const iconSvg = document.createElement('svg');
+        iconSvg.setAttribute('aria-hidden', 'true');
+        iconSvg.setAttribute('focusable', 'false');
+        iconSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        iconSvg.setAttribute('viewBox', '0 0 24 24');
+        iconSvg.className = 'svg-icon icon-sm text-primary'; // Native icon classes
+        iconSvg.style.width = '1.2em';
+        iconSvg.style.height = '1.2em';
+        iconSvg.innerHTML = '<path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28zM3.5 9.72c-.1 0-.2-.03-.29-.09-.23-.16-.28-.47-.12-.7.99-1.4 2.25-2.5 3.75-3.27C9.98 4.04 14 4.03 17.15 5.65c1.5.77 2.76 1.86 3.75 3.25.16.22.11.54-.12.7-.23.16-.54.11-.7-.12-.9-1.26-2.04-2.25-3.39-2.94-2.87-1.47-6.54-1.47-9.4.01-1.36.7-2.5 1.7-3.4 2.96-.08.14-.23.21-.39.21zm6.25 12.07c-.13 0-.26-.05-.35-.15-.87-.87-1.34-1.43-2.01-2.64-.69-1.23-1.05-2.73-1.05-4.34 0-2.97 2.54-5.39 5.66-5.39s5.66 2.42 5.66 5.39c0 .28-.22.5-.5.5s-.5-.22-.5-.5c0-2.42-2.09-4.39-4.66-4.39s-4.66 1.97-4.66 4.39c0 1.44.32 2.77.93 3.85.64 1.15 1.08 1.64 1.85 2.42.19.2.19.51 0 .71-.11.1-.24.15-.37.15z"/>';
+        
+        const title = document.createElement('h3');
+        title.className = 'font-semibold text-sm text-main'; // Native heading classes
         title.textContent = 'BeatPassID Protection';
         
-        const badge = document.createElement('div');
-        badge.className = 'px-8 py-4 rounded-full text-xs font-medium';
-        badge.style.cssText = `
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-        `;
-        badge.textContent = 'Sample-Safeâ„¢';
+        headerLeft.appendChild(iconSvg);
+        headerLeft.appendChild(title);
+        header.appendChild(headerLeft);
         
-        header.appendChild(icon);
-        header.appendChild(title);
-        header.appendChild(badge);
-        
-        // Content area
+        // Content area - will be populated based on status
         const content = document.createElement('div');
         content.id = 'dashboard-content';
-        content.className = 'dashboard-content';
+        content.className = 'mt-12';
         
-        dashboard.appendChild(header);
-        dashboard.appendChild(content);
+        innerCard.appendChild(header);
+        innerCard.appendChild(content);
+        mainCard.appendChild(innerCard);
+        dashboard.appendChild(mainCard);
+        
+        // Trigger fade-in after creation
+        setTimeout(() => {
+            requestAnimationFrame(() => {
+                dashboard.style.opacity = '1';
+                dashboard.style.transform = 'translateY(0)';
+            });
+        }, 50);
         
         return dashboard;
     }
@@ -1551,7 +1670,16 @@
     function removeFingerprintDashboard() {
         const dashboard = document.getElementById('fingerprint-dashboard');
         if (dashboard) {
-            dashboard.remove();
+            // Smooth fade-out before removal
+            dashboard.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+            dashboard.style.opacity = '0';
+            dashboard.style.transform = 'translateY(-10px)';
+            
+            setTimeout(() => {
+                if (dashboard.parentNode) {
+                    dashboard.remove();
+                }
+            }, 300);
             console.log('ðŸ” Fingerprint dashboard removed');
         }
     }
@@ -3537,7 +3665,7 @@
     function testFingerprintDeletion() {
         console.log('Testing fingerprint deletion...');
         
-        const trackId = getCurrentTrackId();
+        const trackId = window.getCurrentTrackId ? window.getCurrentTrackId() : null;
         if (trackId) {
             deleteFingerprintFromDatabase(trackId)
                 .then(result => {
@@ -3554,22 +3682,227 @@
     }
 
     // Utility function to get current track ID
-    function getCurrentTrackId() {
-        // Try multiple methods to get track ID
-        const urlParams = new URLSearchParams(window.location.search);
-        const trackId = urlParams.get('track_id') || urlParams.get('id');
-        
-        if (trackId) return trackId;
-        
-        // Try to extract from URL path
-        const pathMatch = window.location.pathname.match(/\/track\/(\d+)/);
-        if (pathMatch) return pathMatch[1];
-        
-        // Try to find in form data
-        const trackIdInput = document.querySelector('input[name="track_id"]');
-        if (trackIdInput && trackIdInput.value) return trackIdInput.value;
-        
+    // getCurrentTrackId function is now globally available from beatpass-core.js
+
+    // Helper function to format price
+    function formatPrice(price, currency = 'USD') {
+        if (!price) return '';
+        const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency + ' ';
+        return `${symbol}${price}`;
+    }
+
+    // Fetch existing custom data for edit pages
+    async function fetchExistingCustomData() {
+        const trackId = getTrackId();
+        const trackName = getTrackName();
+        let params;
+        if (trackId) {
+            params = new URLSearchParams({ track_id: trackId });
+        } else if (trackName) {
+            params = new URLSearchParams({ track_name: trackName });
+        } else {
+            return null;
+        }
+        try {
+            const res = await fetch(`${API_URL}?${params}`);
+            const data = await res.json();
+            if (data.status === 'success' && data.data) {
+                return data.data;
+            }
+        } catch (err) {
+            console.error("Error fetching custom data:", err);
+        }
         return null;
+    }
+
+    // Helper function to get track name from form
+    function getTrackName() {
+        const nameField = document.querySelector('input[name="name"]');
+        return nameField ? nameField.value.trim() : '';
+    }
+
+    // Track page metadata initialization function
+    async function initTrackPage(attempt = 1, maxAttempts = 3) {
+        if (!window.isTrackPage || !window.isTrackPage()) {
+            console.log('🎵 Not on track page, skipping track page initialization');
+            return;
+        }
+        
+        console.log(`🎵 Initializing track page metadata display... (attempt ${attempt}/${maxAttempts})`);
+        
+        const trackId = window.getCurrentTrackId ? window.getCurrentTrackId() : null;
+        const infoContainer = getInfoContainer();
+        
+        if (!trackId) {
+            console.warn('🎵 No track ID found for track page initialization');
+            if (attempt < maxAttempts) {
+                console.log(`🎵 Retrying track page initialization in 500ms... (attempt ${attempt + 1}/${maxAttempts})`);
+                setTimeout(() => initTrackPage(attempt + 1, maxAttempts), 500);
+            }
+            return;
+        }
+        
+        if (!infoContainer) {
+            console.warn('🎵 Track info container not found for metadata injection');
+            if (attempt < maxAttempts) {
+                console.log(`🎵 Retrying track page initialization in 500ms... (attempt ${attempt + 1}/${maxAttempts})`);
+                setTimeout(() => initTrackPage(attempt + 1, maxAttempts), 500);
+            }
+            return;
+        }
+        
+        try {
+            // Fetch track metadata from database
+            const response = await fetch(`${API_URL}?track_id=${trackId}`);
+            const result = await response.json();
+            
+            if (result.status === 'success' && result.data) {
+                console.log('🎵 Track metadata fetched successfully:', result.data);
+                
+                // Inject metadata display on track page
+                injectTrackPageMetadata(result.data);
+                console.log('✅ Track page metadata initialization completed successfully');
+            } else {
+                console.log('🎵 No metadata found for track ID:', trackId);
+            }
+        } catch (error) {
+            console.error('🎵 Error fetching track metadata:', error);
+            if (attempt < maxAttempts) {
+                console.log(`🎵 Retrying track page initialization due to error in 600ms... (attempt ${attempt + 1}/${maxAttempts})`);
+                setTimeout(() => initTrackPage(attempt + 1, maxAttempts), 600);
+            }
+        }
+    }
+    
+    // Legacy-style helper functions for track metadata display
+    function getInfoContainer() {
+        // Try the specific selector first, then fall back to more generic ones
+        return document.querySelector('.text-muted.mt-18.md\\:mt-26.text-sm.w-max.mx-auto.md\\:mx-0 .flex.items-center.gap-4.text-sm.text-muted') ||
+               document.querySelector('.flex.items-center.gap-4.text-sm.text-muted') ||
+               document.querySelector('.text-sm.text-muted .flex.items-center.gap-4');
+    }
+
+    function clearInjectedTrackData() {
+        document.querySelectorAll('.custom-key, .custom-scale, .custom-bpm, .custom-exclusive, .custom-separator')
+            .forEach(el => el.remove());
+    }
+
+    function createSeparator() {
+        const sep = document.createElement('div');
+        sep.className = 'custom-separator flex items-center';
+        sep.style.cssText = `
+            opacity: 0;
+            transform: scale(0.8);
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+        `;
+        sep.innerHTML = `
+            <svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" class="text-gray-500">
+                <circle cx="12" cy="12" r="8"/>
+            </svg>
+        `;
+        
+        // Trigger fade-in animation
+        setTimeout(() => {
+            requestAnimationFrame(() => {
+                sep.style.opacity = '1';
+                sep.style.transform = 'scale(1)';
+            });
+        }, 75); // Slightly delayed to appear after data elements
+        
+        return sep;
+    }
+
+    function createDataElement(cls, content) {
+        const d = document.createElement('div');
+        d.className = cls;
+        d.style.cssText = `
+            opacity: 0;
+            transform: translateX(-5px);
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+        `;
+        d.textContent = content;
+        
+        // Trigger fade-in animation
+        setTimeout(() => {
+            requestAnimationFrame(() => {
+                d.style.opacity = '1';
+                d.style.transform = 'translateX(0)';
+            });
+        }, 50);
+        
+        return d;
+    }
+
+    function injectNewTrackData(data, container) {
+        const elements = [];
+        if (data.key_name) elements.push(createDataElement('custom-key', data.key_name));
+        if (data.scale) elements.push(createDataElement('custom-scale', data.scale));
+        if (data.bpm) elements.push(createDataElement('custom-bpm', `${data.bpm} BPM`));
+        
+        // Add exclusive licensing info if available
+        if (data.licensing_type && data.licensing_type !== 'non_exclusive_only') {
+            if (data.exclusive_price && data.exclusive_price > 0) {
+                const priceText = `Exclusive: ${formatPrice(data.exclusive_price, data.exclusive_currency)}`;
+                elements.push(createDataElement('custom-exclusive', priceText));
+            } else if (data.exclusive_status === 'sold') {
+                elements.push(createDataElement('custom-exclusive', 'Exclusively Sold'));
+            }
+        }
+        
+        if (elements.length === 0) return;
+        
+        const durationEl = Array.from(container.children).find(c => c.textContent.match(/\d+min/));
+        const insertBefore = durationEl || container.lastChild;
+        
+        elements.forEach((el, i) => {
+            if (i > 0) {
+                const sep = createSeparator();
+                container.insertBefore(sep, insertBefore);
+            }
+            container.insertBefore(el, insertBefore);
+        });
+        if (elements.length && durationEl && durationEl.previousElementSibling?.className !== 'custom-separator') {
+            const sep = createSeparator();
+            container.insertBefore(sep, durationEl);
+        }
+    }
+
+    // Function to inject metadata display on track page (legacy-style)
+    function injectTrackPageMetadata(metadata) {
+        const container = getInfoContainer();
+        if (!container) {
+            console.warn('🎵 Track info container not found, cannot inject metadata');
+            return;
+        }
+        
+        // Check if data is already injected to prevent loops
+        const existingCustom = container.querySelector('.custom-key, .custom-scale, .custom-bpm, .custom-exclusive');
+        if (existingCustom && 
+            container.querySelector('.custom-key')?.textContent === metadata.key_name &&
+            container.querySelector('.custom-scale')?.textContent === metadata.scale &&
+            container.querySelector('.custom-bpm')?.textContent === `${metadata.bpm} BPM`) {
+            return; // Data already matches, don't re-inject
+        }
+        
+        // Smooth fade-out existing data
+        const existingElements = container.querySelectorAll('.custom-key, .custom-scale, .custom-bpm, .custom-exclusive, .custom-separator');
+        if (existingElements.length > 0) {
+            existingElements.forEach(el => {
+                el.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+                el.style.opacity = '0';
+                el.style.transform = 'translateX(-5px)';
+            });
+            
+            // Remove elements after fade-out
+            setTimeout(() => {
+                clearInjectedTrackData();
+                injectNewTrackData(metadata, container);
+            }, 200);
+        } else {
+            injectNewTrackData(metadata, container);
+        }
+        
+        console.log('🎵 Track metadata display injected successfully');
     }
 
     // Global exposure for external access
@@ -3653,6 +3986,8 @@
     window.showNotification = showNotification;
     window.testFingerprintFailureUI = testFingerprintFailureUI;
     window.testFingerprintDeletion = testFingerprintDeletion;
+    window.initTrackPage = initTrackPage;
+    window.injectTrackPageMetadata = injectTrackPageMetadata;
 
     console.log('Fingerprinting System module loaded successfully');
 

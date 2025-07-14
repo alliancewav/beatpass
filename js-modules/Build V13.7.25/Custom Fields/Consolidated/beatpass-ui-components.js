@@ -1,4 +1,4 @@
-﻿// Custom Field Creator Module - IIFE
+// Custom Field Creator Module - IIFE
 // Handles creation of custom form fields with native UI styling
 
 (function() {
@@ -50,6 +50,7 @@
                     input.dispatchEvent(new Event('change',{bubbles:true}));
                     if (window.enableSubmitButton) window.enableSubmitButton();
                     if (window.updatePendingCustomData) window.updatePendingCustomData();
+                    if (window.debouncedAutoSave) window.debouncedAutoSave();
                     if (window.isEditPage && window.isEditPage() && window.debouncedUpdateDashboardContent) {
                         setTimeout(()=>window.debouncedUpdateDashboardContent(),100);
                     }
@@ -130,6 +131,7 @@
             e.target.dispatchEvent(new Event('change', { bubbles: true }));
             if (window.enableSubmitButton) window.enableSubmitButton();
             if (window.updatePendingCustomData) window.updatePendingCustomData();
+            if (window.debouncedAutoSave) window.debouncedAutoSave();
             if (window.isEditPage && window.isEditPage() && window.debouncedUpdateDashboardContent) {
                 setTimeout(() => window.debouncedUpdateDashboardContent(), 100);
             }
@@ -167,6 +169,7 @@
             input.dispatchEvent(new Event('change', { bubbles: true }));
             if (window.enableSubmitButton) window.enableSubmitButton();
             if (window.updatePendingCustomData) window.updatePendingCustomData();
+            if (window.debouncedAutoSave) window.debouncedAutoSave();
             if (window.isEditPage && window.isEditPage() && window.debouncedUpdateDashboardContent) {
                 setTimeout(() => window.debouncedUpdateDashboardContent(), 100);
             }
@@ -294,61 +297,96 @@
     }
 
     async function fetchExistingCustomData() {
-        clearCustomFields();
         const trackId = window.getTrackId ? window.getTrackId() : null;
         const trackName = window.getTrackName ? window.getTrackName() : null;
+        
+        console.log('🔍 fetchExistingCustomData - Track ID:', trackId, 'Track Name:', trackName);
+        console.log('🔍 Current URL:', window.location.pathname);
+        console.log('🔍 getTrackId function available:', typeof window.getTrackId);
+        
+        // Return null if no track identifier is available
+        if (!trackId && !trackName) {
+            console.log('ℹ️ No track ID or name available for data fetching');
+            return null;
+        }
+        
         let params;
         if (trackId) {
             params = new URLSearchParams({ track_id: trackId });
         } else if (trackName) {
             params = new URLSearchParams({ track_name: trackName });
-        } else {
-            injectCustomFields();
-            return;
         }
+        
         try {
             const API_URL = window.API_URL || 'https://open.beatpass.ca/key_bpm_handler.php';
             const res = await fetch(`${API_URL}?${params}`);
             const data = await res.json();
+            
             if (data.status === 'success' && data.data) {
                 window.customRecord = data.data;
-                injectCustomFields(data.data);
+                console.log('✅ Successfully fetched existing data:', data.data);
+                return data.data;
             } else {
                 window.customRecord = null;
-                if (window.debouncedInjectCustomFields) {
-                    window.debouncedInjectCustomFields();
-                } else {
-                    injectCustomFields();
-                }
+                console.log('ℹ️ No existing data found in database');
+                return null;
             }
         } catch (err) {
-            console.error("Error fetching custom data:", err);
+            console.error("❌ Error fetching custom data:", err);
             window.customRecord = null;
-            if (window.debouncedInjectCustomFields) {
-                window.debouncedInjectCustomFields();
-            } else {
-                injectCustomFields();
-            }
+            return null;
         }
     }
 
-    function injectCustomFields(existingData = { 
-        key_name: '', 
-        scale: '', 
-        bpm: '', 
-        producers: '', 
-        tags: '',
-        licensing_type: 'non_exclusive_only',
-        exclusive_price: '',
-        exclusive_currency: 'USD',
-        exclusive_status: 'not_available',
-        exclusive_buyer_info: ''
-    }) {
-        console.log("ðŸŽ¯ Starting custom fields injection...");
+    async function injectCustomFields(existingData = null, skipFetch = false) {
+        console.log("🎯 Starting custom fields injection...");
+        console.log('🔍 Parameters - existingData:', existingData, 'skipFetch:', skipFetch);
+        console.log('🔍 Current page type - isEditPage:', window.isEditPage ? window.isEditPage() : 'function not available');
         
         if (isFieldsInjected || document.getElementById('custom-fields-container')) {
-            console.log('âš ï¸ Custom fields already injected, skipping');
+            console.log('⚠️ Custom fields already injected, skipping');
             return;
+        }
+        
+        // Check if core functions are available before proceeding
+        const coreReady = window.getTrackId && window.getTrackName && window.isEditPage;
+        if (!coreReady && !skipFetch) {
+            console.warn('⚠️ Core functions not ready for injection, waiting...');
+            setTimeout(() => injectCustomFields(existingData, skipFetch), 500);
+            return;
+        }
+        
+        // If no existing data provided and we're not skipping fetch, try to fetch from database
+        if (!existingData && !skipFetch) {
+            console.log('📡 No existing data provided, fetching from database...');
+            try {
+                existingData = await fetchExistingCustomData();
+                if (existingData) {
+                    console.log('✅ Successfully fetched existing data:', existingData);
+                } else {
+                    console.log('ℹ️ No existing data found, using defaults');
+                }
+            } catch (error) {
+                console.error('❌ Error fetching existing data:', error);
+            }
+        } else if (skipFetch) {
+            console.log('⏭️ Skipping fetch as requested, using provided data:', existingData);
+        }
+        
+        // Use defaults if no data found
+        if (!existingData) {
+            existingData = {
+                key_name: '', 
+                scale: '', 
+                bpm: '', 
+                producers: '', 
+                tags: '',
+                licensing_type: 'non_exclusive_only',
+                exclusive_price: '',
+                exclusive_currency: 'USD',
+                exclusive_status: 'not_available',
+                exclusive_buyer_info: ''
+            };
         }
 
         const nameField = document.querySelector('input[name="name"]');
@@ -370,11 +408,7 @@
                         
                         // Small delay to ensure form is fully ready
                         setTimeout(() => {
-                            if (window.debouncedInjectCustomFields) {
-                                window.debouncedInjectCustomFields(existingData);
-                            } else {
-                                injectCustomFields(existingData);
-                            }
+                            injectCustomFields(existingData, true); // Skip fetch since we already have data
                         }, 100);
                     } else if (observerAttempts >= maxObserverAttempts) {
                         console.warn("âš ï¸ Name field did not appear after maximum attempts, stopping observer");
@@ -467,15 +501,29 @@
                 container.style.transform = 'translateY(0)';
                 fieldsReady = true;
                 isFieldsInjected = true;
-                console.log("ðŸŽ‰ Custom fields animation complete - fields ready!");
+                setFieldsInjected(true);
+                console.log("🎉 Custom fields animation complete - fields ready!");
             }, 50);
             
         } catch (error) {
-            console.error("âŒ Failed to insert custom fields container:", error);
+            console.error("❌ Failed to insert custom fields container:", error);
+            setFieldsInjected(false);
         }
     }
     
     // ---------------------------
+    // Track injection status
+    let fieldsInjected = false;
+    
+    function getFieldsInjected() {
+        return fieldsInjected;
+    }
+    
+    function setFieldsInjected(status) {
+        fieldsInjected = status;
+        console.log('📌 Fields injection status set to:', status);
+    }
+    
     // Global Exposure
     // ---------------------------
     
@@ -484,9 +532,10 @@
     window.clearCustomFields = clearCustomFields;
     window.fetchExistingCustomData = fetchExistingCustomData;
     window.injectCustomFields = injectCustomFields;
+    window.getFieldsInjected = getFieldsInjected;
+    window.setFieldsInjected = setFieldsInjected;
     
     // Expose state getters
-    window.getFieldsInjected = () => isFieldsInjected;
     window.getFieldsReady = () => fieldsReady;
     
     console.log('âœ… Form Injection functions exposed to window object');
@@ -560,6 +609,7 @@
             input.dispatchEvent(new Event('change', { bubbles: true }));
             enableSubmitButton();
             updatePendingCustomData();
+            if (window.debouncedAutoSave) window.debouncedAutoSave();
             if (isEditPage()) {
                 setTimeout(() => debouncedUpdateDashboardContent(), 100);
             }
@@ -794,6 +844,7 @@
                 }
                 
                 updatePendingCustomData();
+                if (window.debouncedAutoSave) window.debouncedAutoSave();
                 if (isEditPage()) {
                     setTimeout(() => debouncedUpdateDashboardContent(), 100);
                 }

@@ -164,8 +164,9 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    // Initialize the badge logic on DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', async function() {
+    // Global initialization function for SPA routing
+    window.initVerifiedProducers = async function() {
+        console.log('[VerifiedProducers] Re-initializing for SPA navigation...');
         try {
             // Use VerifiedProducersInitManager if available
             if (window.VerifiedProducersInitManager) {
@@ -181,5 +182,10 @@
         } catch (error) {
             console.error('Error initializing verified producers:', error);
         }
+    };
+
+    // Initialize the badge logic on DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', async function() {
+        await window.initVerifiedProducers();
     });
 })();

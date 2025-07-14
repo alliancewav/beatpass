@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // BeatPass Utilities - Standalone IIFE Module
 // Zero dependencies, self-contained utility functions
 // ============================================================
@@ -101,6 +101,30 @@
     function getTrackId() {
         const m = window.location.pathname.match(/\/backstage\/tracks\/(\d+)\/edit/);
         return m ? m[1] : null;
+    }
+    
+    function getCurrentTrackId() {
+        // Try multiple methods to get track ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const trackId = urlParams.get('track_id') || urlParams.get('id');
+        
+        if (trackId) return trackId;
+        
+        // For track view pages like /track/3420/linked
+        const trackViewMatch = window.location.pathname.match(/\/track\/(\d+)/);
+        if (trackViewMatch) {
+            return trackViewMatch[1];
+        }
+        
+        // For edit pages, use the existing getTrackId function
+        const editPageId = getTrackId();
+        if (editPageId) return editPageId;
+        
+        // Try to find in form data
+        const trackIdInput = document.querySelector('input[name="track_id"]');
+        if (trackIdInput && trackIdInput.value) return trackIdInput.value;
+        
+        return null;
     }
     
     function getTrackName() {
@@ -217,6 +241,7 @@
         
         // Track data extraction
         getTrackId,
+        getCurrentTrackId,
         getTrackName,
         getDuration,
         
@@ -234,6 +259,22 @@
         }
     };
 
+    // ---------------------------
+    // Legacy Global Exposure
+    // ---------------------------
+    
+    // Expose individual functions to window for legacy compatibility
+    window.getTrackId = getTrackId;
+    window.getCurrentTrackId = getCurrentTrackId;
+    window.getTrackName = getTrackName;
+    window.getDuration = getDuration;
+    window.isUploadPage = isUploadPage;
+    window.isEditPage = isEditPage;
+    window.isTrackPage = isTrackPage;
+    window.isConfirmationPage = isConfirmationPage;
+    window.enableSubmitButton = enableSubmitButton;
+    window.disableSubmitButton = disableSubmitButton;
+    
     // ---------------------------
     // Auto-Initialization
     // ---------------------------

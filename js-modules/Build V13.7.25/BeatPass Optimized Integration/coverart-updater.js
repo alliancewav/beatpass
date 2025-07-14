@@ -405,5 +405,8 @@
         });
     }
     
+    // Expose initialization function globally for SPA routing
+    window.initCoverArtUpdater = initCoverArtUpdater;
+    
     console.log('[CoverArtUpdater] Integration module loaded successfully');
 })();

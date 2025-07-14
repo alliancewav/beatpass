@@ -1,0 +1,164 @@
+<script>
+    (function() {
+        'use strict';
+        
+        // Configuration with system switching support
+        const config = {
+            defaultSystem: 'v13725',
+            cache: Date.now(),
+            paths: {
+                v13725: './js-modules/Build V13.7.25/',
+                legacy: './js-modules/legacy/'
+            }
+        };
+        
+        // System definitions
+        const systems = {
+            v13725: {
+                name: 'Build V13.7.25',
+                modules: [
+                    // Core UI helpers
+                    'UI-helpers.js',
+                    
+                    // BeatPass Optimized Integration modules
+                    'BeatPass Optimized Integration/BeatPassIntegration.js',
+                    'BeatPass Optimized Integration/ad-removal.js',
+                    'BeatPass Optimized Integration/cheque-button-removal.js',
+                    'BeatPass Optimized Integration/coverart-updater.js',
+                    'BeatPass Optimized Integration/immersive-styling.js',
+                    'BeatPass Optimized Integration/openwidget-integration.js',
+                    'BeatPass Optimized Integration/webpushr-integration.js',
+                    
+                    // Custom Fields - ONLY Consolidated modules (excluding Refractored)
+                    'Custom Fields/Consolidated/beatpass-core.js',
+                    'Custom Fields/Consolidated/beatpass-features.js',
+                    'Custom Fields/Consolidated/beatpass-ui-components.js',
+                    'Custom Fields/Consolidated/beatpass-banners.js',
+                    'Custom Fields/Consolidated/beatpass-spa-router.js',
+                    
+                    // Additional core modules
+                    'pricing-enhancements.js',
+                    'verified-producers.js',
+                    'bp-notes.js',
+                    'cd-spin.js',
+                    'queue-enhancement.js'
+                ]
+            },
+            legacy: {
+                name: 'Legacy System',
+                modules: [
+                    'UI-helpers.js',
+                    'BeatpassOptimizedIntegration.js',
+                    'custom-fields.js',
+                    'pricing-enhancements.js',
+                    'verified-producers.js',
+                    'bp-notes.js',
+                    'cd-spin.js',
+                    'queue-enhancement.js'
+                ]
+            }
+        };
+        
+        // Simple script loader function
+        function loadScript(src) {
+            const script = document.createElement('script');
+            script.src = src;
+            script.defer = true;
+            document.head.appendChild(script);
+        }
+        
+        // Load system modules
+        function loadSystem(systemKey) {
+            const system = systems[systemKey];
+            const basePath = config.paths[systemKey];
+            
+            if (!system || !basePath) {
+                console.error(`❌ Unknown system: ${systemKey}`);
+                return;
+            }
+            
+            console.log(`🚀 Loading BeatPass ${system.name} (${system.modules.length} modules)...`);
+            
+            system.modules.forEach(module => {
+                const src = `${basePath}${module}?v=${config.cache}`;
+                console.log(`Loading: ${module}`);
+                loadScript(src);
+            });
+            
+            // Set global status
+            window.BeatpassSystemUsed = systemKey;
+            window.BeatpassLoadResults = {
+                system: systemKey,
+                total: system.modules.length,
+                loaded: system.modules.length,
+                failed: []
+            };
+            
+            console.log(`✅ Initiated loading of ${system.modules.length} ${system.name} modules`);
+            
+            // Dispatch ready event
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('beatpass:system-ready', {
+                    detail: {
+                        system: systemKey,
+                        name: system.name,
+                        modules: system.modules.length
+                    }
+                }));
+                console.log(`🎉 BeatPass ${system.name} injection complete!`);
+            }, 1000);
+        }
+        
+        // Enhanced status interface with system switching
+        window.BeatpassSystemStatus = {
+            getCurrentSystem: () => window.BeatpassSystemUsed || null,
+            getSystemName: () => {
+                const current = window.BeatpassSystemUsed;
+                return current ? systems[current]?.name || current : null;
+            },
+            getBuildVersion: () => {
+                const current = window.BeatpassSystemUsed;
+                return current === 'v13725' ? 'V13.7.25' : current === 'legacy' ? 'Legacy' : 'Unknown';
+            },
+            getModuleCount: () => {
+                const current = window.BeatpassSystemUsed;
+                return current ? systems[current]?.modules.length || 0 : 0;
+            },
+            getLoadedModules: () => {
+                const results = window.BeatpassLoadResults;
+                return results ? results.loaded : 0;
+            },
+            getAvailableSystems: () => Object.keys(systems),
+            
+            // System switching functions
+            switchToV13725: () => {
+                localStorage.setItem('beatpass-preferred-system', 'v13725');
+                console.log('🔄 Switching to Build V13.7.25...');
+                location.reload();
+            },
+            switchToLegacy: () => {
+                localStorage.setItem('beatpass-preferred-system', 'legacy');
+                console.log('🔄 Switching to Legacy system...');
+                location.reload();
+            },
+            clearPreference: () => {
+                localStorage.removeItem('beatpass-preferred-system');
+                console.log('🗑️ Cleared system preference');
+            },
+            reload: () => location.reload()
+        };
+        
+        // Initialize system based on preference or default
+        const preferredSystem = localStorage.getItem('beatpass-preferred-system');
+        const activeSystem = (preferredSystem && systems[preferredSystem]) ? preferredSystem : config.defaultSystem;
+        
+        console.log(`🎯 Active system: ${systems[activeSystem].name} (${activeSystem})`);
+        if (preferredSystem && preferredSystem !== activeSystem) {
+            console.warn(`⚠️ Preferred system '${preferredSystem}' not available, using '${activeSystem}'`);
+        }
+        
+        // Load the active system
+        loadSystem(activeSystem);
+        
+    })();
+</script>

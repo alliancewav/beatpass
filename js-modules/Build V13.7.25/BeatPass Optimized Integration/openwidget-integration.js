@@ -53,5 +53,30 @@
         n.OpenWidget = n.OpenWidget || e;
     }(window, document, [].slice));
     
+    // Global initialization function for SPA routing
+    window.initOpenWidget = function() {
+        console.log('[OpenWidget] Re-initializing for SPA navigation...');
+        
+        // Ensure __ow object is still properly configured
+        if (!window.__ow || typeof window.__ow !== 'object') {
+            window.__ow = {
+                organizationId: "b3302ecd-2723-4154-95ee-1468ed9f1e4a",
+                integration_name: "manual_settings",
+                product_name: "openwidget",
+                asyncInit: false
+            };
+        }
+        
+        // Re-initialize OpenWidget if needed
+        if (window.OpenWidget && typeof window.OpenWidget.init === 'function') {
+            try {
+                window.OpenWidget.init();
+                console.log('[OpenWidget] Re-initialization successful');
+            } catch (error) {
+                console.warn('[OpenWidget] Re-initialization failed:', error);
+            }
+        }
+    };
+    
     console.log('[OpenWidget] Integration module loaded successfully');
 })();
