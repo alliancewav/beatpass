@@ -4,7 +4,7 @@
 (function() {
     'use strict';
     
-    const DEBUG = false; // Reduced logging for performance
+    const DEBUG = false; // Disabled to reduce console noise
     
     if (DEBUG) console.log('🎨 Custom Field Creator module loaded');
     
@@ -206,7 +206,7 @@
     window.createPriceField = createPriceField;
     window.mapLabelToValue = mapLabelToValue;
     
-    console.log('✅ Custom Field Creator functions exposed to window object');
+    if (DEBUG) console.log('✅ Custom Field Creator functions exposed to window object');
     
 })();
 // Form Injection Module - IIFE
@@ -215,7 +215,9 @@
 (function() {
     'use strict';
     
-    console.log('📋 Form Injection module loaded');
+    const DEBUG = false; // Reduced logging for performance
+    
+    if (DEBUG) console.log('📋 Form Injection module loaded');
     
     // ---------------------------
     // Module State
@@ -248,7 +250,7 @@
                 exclusive_buyer_info: ''
             };
         
-        console.log("📋 Updating pending custom data:", {
+        if (DEBUG) console.log("📋 Updating pending custom data:", {
             keyName,
             scale,
             bpm,
@@ -280,9 +282,9 @@
                 exclusive_buyer_info
             };
             localStorage.setItem('pendingCustomData', JSON.stringify(pending));
-            console.log("💾 Saved pending custom data to localStorage");
+            if (DEBUG) console.log("💾 Saved pending custom data to localStorage");
         } else {
-            console.warn("⚠️ No data to save - all fields empty");
+            if (DEBUG) console.warn("⚠️ No data to save - all fields empty");
         }
     }
 
@@ -1364,5 +1366,5 @@
     window.createExclusiveLicensingDisplay = createExclusiveLicensingDisplay;
     window.ensureExclusiveLicensingStyles = ensureExclusiveLicensingStyles;
     
-    console.log('✅ Exclusive Licensing module loaded successfully');
+    if (DEBUG) console.log('✅ Exclusive Licensing module loaded successfully');
 })();

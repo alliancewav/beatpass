@@ -2,7 +2,7 @@
 // Verified Producers Badge Module (extracted from BeatpassOptimizedIntegration.js)
 // ============================================================
 (function() {
-    const DEBUG = false; // Reduced logging for performance
+    const DEBUG = false; // Disabled to reduce console noise
     // Utility: Save to cache
     function saveToCache(key, data, ttl) {
         // Use VerifiedProducersInitManager cache if available
@@ -177,15 +177,15 @@
 
     // Global initialization function for SPA routing
     window.initVerifiedProducers = async function() {
-        console.log('[VerifiedProducers] Re-initializing for SPA navigation...');
+        if (DEBUG) console.log('[VerifiedProducers] Re-initializing for SPA navigation...');
         try {
             // Use VerifiedProducersInitManager if available
             if (window.VerifiedProducersInitManager) {
-                console.log('[VerifiedProducers] Using VerifiedProducersInitManager for initialization');
+                if (DEBUG) console.log('[VerifiedProducers] Using VerifiedProducersInitManager for initialization');
                 await window.VerifiedProducersInitManager.init();
             } else {
                 // Fallback to original initialization
-                console.log('[VerifiedProducers] Using fallback initialization');
+                if (DEBUG) console.log('[VerifiedProducers] Using fallback initialization');
                 await fetchCentralJSON();
                 await applyVerifiedBadges();
                 setupVerifiedBadgeObserver();

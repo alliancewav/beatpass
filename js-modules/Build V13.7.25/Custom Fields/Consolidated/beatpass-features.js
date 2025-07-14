@@ -315,6 +315,9 @@
 (function() {
     'use strict';
     
+    // Module constants
+    const DEBUG = false; // Reduced logging for performance
+    
     // ---------------------------
     // Constants and Configuration
     // ---------------------------
@@ -359,7 +362,7 @@
             const startObserving = () => {
                 const observeTarget = targetNode || document.body || document.documentElement;
                 if (!observeTarget) {
-                    console.warn('[BeatPassFeatures] DOM not ready for waitForElement observer, retrying...');
+                    if (DEBUG) console.warn('[BeatPassFeatures] DOM not ready for waitForElement observer, retrying...');
                     setTimeout(startObserving, 100);
                     return;
                 }
@@ -420,7 +423,7 @@
                                   titleCell.querySelector('[class*="max-md:text-[15px]"][class*="overflow-hidden"][class*="overflow-ellipsis"]');
             } catch (e) {
                 // Fallback if CSS selector has issues
-                console.log('[BPMColumnEnhancer] CSS selector error, using fallback');
+                if (DEBUG) console.log('[BPMColumnEnhancer] CSS selector error, using fallback');
             }
         }
         
@@ -442,7 +445,7 @@
         }
         
         const trackName = trackNameElement ? trackNameElement.textContent.trim() : null;
-        console.log('[BPMColumnEnhancer] Extracted track name:', trackName);
+        if (DEBUG) console.log('[BPMColumnEnhancer] Extracted track name:', trackName);
         return trackName;
     }
     
@@ -593,7 +596,7 @@
     async function updateBPMDataProgressively(dataRows) {
         // Validate input
         if (!dataRows || !dataRows.length) {
-            console.warn('[BPMColumnEnhancer] No data rows provided for BPM update');
+            if (DEBUG) console.warn('[BPMColumnEnhancer] No data rows provided for BPM update');
             return;
         }
         
@@ -635,7 +638,7 @@
                             }
                         }
                     } catch (error) {
-                        console.warn('[BPMColumnEnhancer] Error updating BPM for row:', error);
+                        if (DEBUG) console.warn('[BPMColumnEnhancer] Error updating BPM for row:', error);
                     }
                 }));
                 
@@ -669,7 +672,7 @@
         const startObserving = () => {
             const targetNode = document.body || document.documentElement;
             if (!targetNode) {
-                console.warn('[BeatPassBPMColumnEnhancer] DOM not ready for table observer, retrying...');
+                if (DEBUG) console.warn('[BeatPassBPMColumnEnhancer] DOM not ready for table observer, retrying...');
                 setTimeout(startObserving, 100);
                 return;
             }
@@ -724,13 +727,13 @@
         
         // Auto-initialization
         init: function() {
-            console.log('[BeatPassBPMColumnEnhancer] Standalone BPM column enhancer module loaded');
+            if (DEBUG) console.log('[BeatPassBPMColumnEnhancer] Standalone BPM column enhancer module loaded');
             observeTableChanges();
         },
         
         // Cleanup
         cleanup: function() {
-            console.log('[BeatPassBPMColumnEnhancer] Cleaning up...');
+            if (DEBUG) console.log('[BeatPassBPMColumnEnhancer] Cleaning up...');
             stopObserving();
         }
     };
@@ -879,7 +882,7 @@
         const { licensing_type, exclusive_price, exclusive_currency, exclusive_status, exclusive_buyer_info } = getExclusiveLicensingData();
         
         if (DEBUG) {
-            console.log("📋 Updating pending custom data:", {
+            if (DEBUG) console.log("📋 Updating pending custom data:", {
                 keyName,
                 scale,
                 bpm,
@@ -934,7 +937,7 @@
             const isEdit = window.isEditPage && window.isEditPage();
             
             if (!coreReady) {
-                console.warn('⚠️ Auto-save skipped - core functions not ready:', {
+                if (DEBUG) console.warn('⚠️ Auto-save skipped - core functions not ready:', {
                     getTrackId: !!window.getTrackId,
                     getTrackName: !!window.getTrackName,
                     isEditPage: !!window.isEditPage
@@ -989,7 +992,7 @@
                         console.error('❌ Auto-save failed');
                     }
                 } else {
-                    console.warn('⚠️ Auto-save skipped - no track ID available');
+                    if (DEBUG) console.warn('⚠️ Auto-save skipped - no track ID available');
                 }
             } else {
                 if (DEBUG) console.log('ℹ️ Auto-save skipped - not on edit page');
@@ -1035,7 +1038,7 @@
             exclusive_buyer_info = licensingData.exclusive_buyer_info;
             
             if (DEBUG) {
-                console.log("📋 Using form data for submission:", {
+                if (DEBUG) console.log("📋 Using form data for submission:", {
                     key_name, scale, bpm, track_name, track_id, playback_url, duration_ms, producers, tags, licensing_type, exclusive_price, exclusive_currency, exclusive_status, exclusive_buyer_info
                 });
             }
@@ -1043,17 +1046,17 @@
 
         // Enhanced validation with track name requirement
         if (!track_id) {
-            console.warn("❌ Cannot submit custom data: missing track_id");
+            if (DEBUG) console.warn("❌ Cannot submit custom data: missing track_id");
             return false;
         }
 
         if (!track_name || track_name.trim() === '') {
-            console.warn("⚠️ Track name is missing - this may cause database issues");
+            if (DEBUG) console.warn("⚠️ Track name is missing - this may cause database issues");
         }
         
         // Check if we have at least some metadata to submit
         if (!key_name && !scale && !bpm && !track_name && !playback_url && !producers && !tags && licensing_type === 'non_exclusive_only') {
-            console.warn("❌ No metadata to submit - all fields empty");
+            if (DEBUG) console.warn("❌ No metadata to submit - all fields empty");
             return false;
         }
 
@@ -1321,7 +1324,7 @@
             const { licensing_type, exclusive_price, exclusive_currency, exclusive_status, exclusive_buyer_info } = getExclusiveLicensingData();
             
             if (DEBUG) {
-                console.log("📦 Form submission - capturing data:", {
+                if (DEBUG) console.log("📦 Form submission - capturing data:", {
                     key, scale, bpm, trackName: tn, duration, producers, tags,
                     licensing_type, exclusive_price, exclusive_currency, exclusive_status, exclusive_buyer_info
                 });
@@ -1459,8 +1462,10 @@
 // ============================================================
 (function () {
     'use strict';
+    
+    const DEBUG = false;
 
-    console.log('🔍 BeatPassID Fingerprinting System module loaded');
+    if (DEBUG) console.log('🔍 BeatPassID Fingerprinting System module loaded');
 
     // ---------------------------
     // Module Constants
@@ -1474,7 +1479,7 @@
     // ---------------------------
 
     async function generateFingerprint(playbackUrl, track_id) {
-        console.log(`🔍 Generating fingerprint for track ${track_id} with URL: ${playbackUrl}`);
+        if (DEBUG) console.log(`🔍 Generating fingerprint for track ${track_id} with URL: ${playbackUrl}`);
         
         try {
             const response = await fetch(FINGERPRINT_API, {
@@ -1489,7 +1494,7 @@
             });
             
             const data = await response.json();
-            console.log('🔍 Fingerprint generation response:', data);
+            if (DEBUG) console.log('🔍 Fingerprint generation response:', data);
             
             if (data.success) {
                 return {
@@ -1513,7 +1518,7 @@
     }
 
     async function submitFingerprint(fingerprintData, track_id) {
-        console.log(`🔍 Submitting fingerprint for track ${track_id}`);
+        if (DEBUG) console.log(`🔍 Submitting fingerprint for track ${track_id}`);
         
         try {
             // First, check for duplicates
@@ -1529,7 +1534,7 @@
             });
             
             const duplicateCheck = await duplicateCheckResponse.json();
-            console.log('🔍 Duplicate check response:', duplicateCheck);
+            if (DEBUG) console.log('🔍 Duplicate check response:', duplicateCheck);
             
             if (duplicateCheck.isDuplicate) {
                 return {
@@ -1556,7 +1561,7 @@
             });
             
             const submitResult = await submitResponse.json();
-            console.log('🔍 Fingerprint submission response:', submitResult);
+            if (DEBUG) console.log('🔍 Fingerprint submission response:', submitResult);
             
             return {
                 success: submitResult.success || false,
@@ -1573,7 +1578,7 @@
     }
 
     async function deleteFingerprintFromDatabase(track_id) {
-        console.log(`🔍 Deleting fingerprint for track ${track_id} due to ToS violation`);
+        if (DEBUG) console.log(`🔍 Deleting fingerprint for track ${track_id} due to ToS violation`);
         
         try {
             const response = await fetch(API_URL, {
@@ -1589,7 +1594,7 @@
             });
             
             const result = await response.json();
-            console.log('🔍 Fingerprint deletion response:', result);
+            if (DEBUG) console.log('🔍 Fingerprint deletion response:', result);
             
             return result;
         } catch (error) {
@@ -1725,24 +1730,24 @@
                     dashboard.remove();
                 }
             }, 300);
-            console.log('🔍 Fingerprint dashboard removed');
+            if (DEBUG) console.log('🔍 Fingerprint dashboard removed');
         }
     }
 
     function injectFingerprintDashboard() {
         if (!window.isEditPage || !window.isEditPage()) {
-            console.log('🔍 Not on edit page, skipping dashboard injection');
+            if (DEBUG) console.log('🔍 Not on edit page, skipping dashboard injection');
             return;
         }
         
         if (document.getElementById('fingerprint-dashboard')) {
-            console.log('🔍 Dashboard already exists, skipping injection');
+            if (DEBUG) console.log('🔍 Dashboard already exists, skipping injection');
             return;
         }
         
         const form = document.querySelector('form');
         if (!form) {
-            console.warn('🔍 No form found for dashboard injection');
+            if (DEBUG) console.warn('🔍 No form found for dashboard injection');
             return;
         }
         
@@ -1760,11 +1765,11 @@
             }
         }
         
-        console.log('🔍 Fingerprint Dashboard injected successfully');
+        if (DEBUG) console.log('🔍 Fingerprint Dashboard injected successfully');
         
         // Initialize dashboard content with multiple attempts for reliability
         setTimeout(async () => {
-            console.log('🔍 Initializing dashboard content...');
+            if (DEBUG) console.log('🔍 Initializing dashboard content...');
             await updateDashboardContent();
             observePlaybackURLChanges();
             
@@ -1772,7 +1777,7 @@
             setTimeout(async () => {
                 const content = document.getElementById('dashboard-content');
                 if (content && content.innerHTML.trim() === '') {
-                    console.log('🔍 Dashboard content empty, retrying...');
+                    if (DEBUG) console.log('🔍 Dashboard content empty, retrying...');
                     await updateDashboardContent();
                 }
             }, 1000);
@@ -1855,17 +1860,17 @@
     async function updateDashboardContent() {
         const content = document.getElementById('dashboard-content');
         if (!content) {
-            console.warn('🔍 Dashboard content element not found');
+            if (DEBUG) console.warn('🔍 Dashboard content element not found');
             return;
         }
         
         const track_id = window.getTrackId ? window.getTrackId() : null;
         if (!track_id) {
-            console.warn('🔍 No track ID found for dashboard update');
+            if (DEBUG) console.warn('🔍 No track ID found for dashboard update');
             return;
         }
         
-        console.log(`🔍 Updating dashboard content for track ID: ${track_id}`);
+        if (DEBUG) console.log(`🔍 Updating dashboard content for track ID: ${track_id}`);
         
         // Get current playback URL from form
         const playbackInput = document.querySelector('input[name="src"]') || 
@@ -1873,12 +1878,12 @@
             document.querySelector('input[type="url"][name="src"]');
         
         const currentURL = playbackInput ? playbackInput.value.trim() : '';
-        console.log(`🔍 Current playback URL: ${currentURL ? 'Present' : 'None'}`);
+        if (DEBUG) console.log(`🔍 Current playback URL: ${currentURL ? 'Present' : 'None'}`);
         
         // Get fingerprint status from database (includes existing metadata)
-        console.log('🔍 Fetching fingerprint status from database...');
+        if (DEBUG) console.log('🔍 Fetching fingerprint status from database...');
         const statusInfo = await checkPlaybackURLStatus(track_id);
-        console.log('🔍 Fingerprint status received:', {
+        if (DEBUG) console.log('🔍 Fingerprint status received:', {
             hasFingerprint: statusInfo.hasFingerprint,
             isDuplicate: statusInfo.isDuplicate,
             playbackUrl: statusInfo.playbackUrl ? 'Present' : 'None'
@@ -1893,7 +1898,7 @@
                 existingCustomData = metadataResult.data;
             }
         } catch (error) {
-            console.log('🔍 Could not fetch existing metadata:', error);
+            if (DEBUG) console.log('🔍 Could not fetch existing metadata:', error);
         }
         
         // Get metadata completeness (checks both form and database)
@@ -1903,7 +1908,7 @@
         const urlChanged = currentURL && statusInfo.playbackUrl && 
                           currentURL !== statusInfo.playbackUrl;
         
-        console.log('🔍 Dashboard update:', {
+        if (DEBUG) console.log('🔍 Dashboard update:', {
             currentURL: currentURL ? 'Present' : 'None',
             hasFingerprint: statusInfo.hasFingerprint,
             urlChanged,
@@ -1957,7 +1962,7 @@
             document.querySelector('input[type="url"][name="src"]');
         
         if (!playbackInput) {
-            console.warn('🔍 Playback URL input not found for observation');
+            if (DEBUG) console.warn('🔍 Playback URL input not found for observation');
             return;
         }
         
@@ -1966,7 +1971,7 @@
         const checkForChanges = () => {
             const currentValue = playbackInput.value;
             if (currentValue !== lastValue) {
-                console.log('🔍 Playback URL changed, updating dashboard');
+                if (DEBUG) console.log('🔍 Playback URL changed, updating dashboard');
                 lastValue = currentValue;
                 setTimeout(updateDashboardContent, 500); // Debounce updates
             }
@@ -1980,7 +1985,7 @@
         // Periodic check as fallback
         setInterval(checkForChanges, 2000);
         
-        console.log('🔍 Playback URL change observation initialized');
+        if (DEBUG) console.log('🔍 Playback URL change observation initialized');
     }
 
     // ---------------------------
@@ -1988,7 +1993,7 @@
     // ---------------------------
 
     async function startFingerprintingProcess(button = null, track_id = null, fromDashboard = false) {
-        console.log('🔍 Starting fingerprinting process...');
+        if (DEBUG) console.log('🔍 Starting fingerprinting process...');
         
         // Set flag to prevent redirects during fingerprinting
         window.fingerprintOperationInProgress = true;
@@ -2016,7 +2021,7 @@
             }
             
             const playbackUrl = playbackInput.value.trim();
-            console.log('🔍 Using playback URL:', playbackUrl);
+            if (DEBUG) console.log('🔍 Using playback URL:', playbackUrl);
             
             // Fetch existing custom data for validation
             let existingCustomData = null;
@@ -2027,7 +2032,7 @@
                     existingCustomData = result.data;
                 }
             } catch (error) {
-                console.log('🔍 Could not fetch existing data:', error);
+                if (DEBUG) console.log('🔍 Could not fetch existing data:', error);
             }
             
             // Check metadata completeness
@@ -2053,7 +2058,7 @@
             }
             
             // Save playback URL and metadata to database first
-            console.log('🔍 Saving playback URL and metadata...');
+            if (DEBUG) console.log('🔍 Saving playback URL and metadata...');
             const saveResponse = await fetch(API_URL, {
                 method: 'POST',
                 headers: {
@@ -2075,10 +2080,10 @@
             });
             
             const saveResult = await saveResponse.json();
-            console.log('🔍 Save response:', saveResult);
+            if (DEBUG) console.log('🔍 Save response:', saveResult);
             
             // Generate fingerprint
-            console.log('🔍 Generating fingerprint...');
+            if (DEBUG) console.log('🔍 Generating fingerprint...');
             const fingerprintResult = await generateFingerprint(playbackUrl, track_id);
             
             if (!fingerprintResult.success) {
@@ -2101,11 +2106,11 @@
             }
             
             // Submit fingerprint to database
-            console.log('🔍 Submitting fingerprint to database...');
+            if (DEBUG) console.log('🔍 Submitting fingerprint to database...');
             const submitResult = await submitFingerprint(fingerprintResult, track_id);
             
             if (submitResult.isDuplicate) {
-                console.log('🔍 Duplicate detected:', submitResult);
+                if (DEBUG) console.log('🔍 Duplicate detected:', submitResult);
                 
                 if (!submitResult.isAuthentic) {
                     // ToS violation - delete any fingerprint data
@@ -2118,7 +2123,7 @@
                     showNotification('Duplicate content detected - Terms of Service violation', 'error');
                 } else {
                     // Authentic duplicate
-                    console.log('🔍 Authentic duplicate detected');
+                    if (DEBUG) console.log('🔍 Authentic duplicate detected');
                     if (dashboardContent) {
                         await updateDashboardContent();
                     }
@@ -2126,7 +2131,7 @@
                     showNotification('Authentic original detected with duplicates blocked', 'info');
                 }
             } else if (submitResult.success) {
-                console.log('🔍 Fingerprinting completed successfully');
+                if (DEBUG) console.log('🔍 Fingerprinting completed successfully');
                 
                 if (dashboardContent) {
                     await updateDashboardContent();
@@ -3683,7 +3688,7 @@
 
     // Test functions for debugging
     function testFingerprintFailureUI() {
-        console.log('Testing fingerprint failure UI...');
+        if (DEBUG) console.log('Testing fingerprint failure UI...');
         
         const mockSubmitResult = {
             success: false,
@@ -3709,13 +3714,13 @@
     }
 
     function testFingerprintDeletion() {
-        console.log('Testing fingerprint deletion...');
+        if (DEBUG) console.log('Testing fingerprint deletion...');
         
         const trackId = window.getCurrentTrackId ? window.getCurrentTrackId() : null;
         if (trackId) {
             deleteFingerprintFromDatabase(trackId)
                 .then(result => {
-                    console.log('Deletion test result:', result);
+                    if (DEBUG) console.log('Deletion test result:', result);
                     showNotification('Fingerprint deletion test completed', 'success');
                 })
                 .catch(error => {
@@ -3770,11 +3775,11 @@
     // Track page metadata initialization function
     async function initTrackPage(attempt = 1, maxAttempts = 3) {
         if (!window.isTrackPage || !window.isTrackPage()) {
-            console.log('🎵 Not on track page, skipping track page initialization');
+            if (DEBUG) console.log('🎵 Not on track page, skipping track page initialization');
             return;
         }
         
-        console.log(`🎵 Initializing track page metadata display... (attempt ${attempt}/${maxAttempts})`);
+        if (DEBUG) console.log(`🎵 Initializing track page metadata display... (attempt ${attempt}/${maxAttempts})`);
         
         const trackId = window.getCurrentTrackId ? window.getCurrentTrackId() : null;
         const infoContainer = getInfoContainer();
@@ -3782,7 +3787,7 @@
         if (!trackId) {
             console.warn('🎵 No track ID found for track page initialization');
             if (attempt < maxAttempts) {
-                console.log(`🎵 Retrying track page initialization in 500ms... (attempt ${attempt + 1}/${maxAttempts})`);
+                if (DEBUG) console.log(`🎵 Retrying track page initialization in 500ms... (attempt ${attempt + 1}/${maxAttempts})`);
                 setTimeout(() => initTrackPage(attempt + 1, maxAttempts), 500);
             }
             return;
@@ -3791,7 +3796,7 @@
         if (!infoContainer) {
             console.warn('🎵 Track info container not found for metadata injection');
             if (attempt < maxAttempts) {
-                console.log(`🎵 Retrying track page initialization in 500ms... (attempt ${attempt + 1}/${maxAttempts})`);
+                if (DEBUG) console.log(`🎵 Retrying track page initialization in 500ms... (attempt ${attempt + 1}/${maxAttempts})`);
                 setTimeout(() => initTrackPage(attempt + 1, maxAttempts), 500);
             }
             return;
@@ -3803,18 +3808,18 @@
             const result = await response.json();
             
             if (result.status === 'success' && result.data) {
-                console.log('🎵 Track metadata fetched successfully:', result.data);
+                if (DEBUG) console.log('🎵 Track metadata fetched successfully:', result.data);
                 
                 // Inject metadata display on track page
                 injectTrackPageMetadata(result.data);
-                console.log('✅ Track page metadata initialization completed successfully');
+                if (DEBUG) console.log('✅ Track page metadata initialization completed successfully');
             } else {
-                console.log('🎵 No metadata found for track ID:', trackId);
+                if (DEBUG) console.log('🎵 No metadata found for track ID:', trackId);
             }
         } catch (error) {
             console.error('🎵 Error fetching track metadata:', error);
             if (attempt < maxAttempts) {
-                console.log(`🎵 Retrying track page initialization due to error in 600ms... (attempt ${attempt + 1}/${maxAttempts})`);
+                if (DEBUG) console.log(`🎵 Retrying track page initialization due to error in 600ms... (attempt ${attempt + 1}/${maxAttempts})`);
                 setTimeout(() => initTrackPage(attempt + 1, maxAttempts), 600);
             }
         }
@@ -3948,7 +3953,7 @@
             injectNewTrackData(metadata, container);
         }
         
-        console.log('🎵 Track metadata display injected successfully');
+        if (DEBUG) console.log('🎵 Track metadata display injected successfully');
     }
 
     // Global exposure for external access
@@ -4035,6 +4040,6 @@
     window.initTrackPage = initTrackPage;
     window.injectTrackPageMetadata = injectTrackPageMetadata;
 
-    console.log('Fingerprinting System module loaded successfully');
+    if (DEBUG) console.log('Fingerprinting System module loaded successfully');
 
 })();

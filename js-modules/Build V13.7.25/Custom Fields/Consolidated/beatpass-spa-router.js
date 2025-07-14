@@ -8,7 +8,7 @@
 
     // Module constants
     const MODULE_NAME = 'BeatPassSPARouter';
-    const DEBUG = false; // Reduced logging for performance
+    const DEBUG = false; // Disabled to reduce console noise
 
     // State management
     let isInitialized = false;
@@ -74,12 +74,12 @@
             const trackId = window.getTrackId ? window.getTrackId() : null;
             
             if (DEBUG) {
-                console.log(`Core functions check attempt ${attempt}/${maxAttempts}:`);
-                console.log('  getTrackId:', !!window.getTrackId);
-                console.log('  getTrackName:', !!window.getTrackName);
-                console.log('  isEditPage:', !!window.isEditPage);
-                console.log('  trackId available:', trackId);
-                console.log('  current URL:', window.location.pathname);
+                if (DEBUG) console.log(`Core functions check attempt ${attempt}/${maxAttempts}:`);
+                if (DEBUG) console.log('  getTrackId:', !!window.getTrackId);
+                if (DEBUG) console.log('  getTrackName:', !!window.getTrackName);
+                if (DEBUG) console.log('  isEditPage:', !!window.isEditPage);
+                if (DEBUG) console.log('  trackId available:', trackId);
+                if (DEBUG) console.log('  current URL:', window.location.pathname);
             }
             
             if (coreReady && (isUploadPage() || (isEditPage() && trackId))) {
@@ -104,7 +104,7 @@
                         }
                     }, 400);
                 } else {
-                    console.warn('⚠️ injectCustomFields function not available');
+                    if (DEBUG) console.warn('⚠️ injectCustomFields function not available');
                 }
             } else if (attempt < maxAttempts) {
                 // Prerequisites not ready, retry
@@ -134,12 +134,12 @@
                 const formContainer = document.querySelector('form') || document.querySelector('.form-container');
                 
                 if (DEBUG) {
-                    console.log(`BeatPass ID injection attempt ${attempt}/${maxAttempts}:`);
-                    console.log('   Core ready:', !!coreReady);
-                    console.log('   Track ID available:', trackId);
-                    console.log('   Dashboard exists:', !!dashboardExists);
-                    console.log('   Form container found:', !!formContainer);
-                    console.log('   Current URL:', window.location.pathname);
+                    if (DEBUG) console.log(`BeatPass ID injection attempt ${attempt}/${maxAttempts}:`);
+                    if (DEBUG) console.log('   Core ready:', !!coreReady);
+                    if (DEBUG) console.log('   Track ID available:', trackId);
+                    if (DEBUG) console.log('   Dashboard exists:', !!dashboardExists);
+                    if (DEBUG) console.log('   Form container found:', !!formContainer);
+                    if (DEBUG) console.log('   Current URL:', window.location.pathname);
                 }
                 
                 if (coreReady && trackId && formContainer && !dashboardExists) {
@@ -167,7 +167,7 @@
                     const reason = !coreReady ? 'core functions not ready' : 
                                   !trackId ? 'track ID not available' : 
                                   !formContainer ? 'form container not found' : 'unknown';
-                    console.warn(`⚠️ BeatPass ID prerequisites not ready (${reason}), retrying in 700ms... (attempt ${attempt + 1}/${maxAttempts})`);
+                    if (DEBUG) console.warn(`⚠️ BeatPass ID prerequisites not ready (${reason}), retrying in 700ms... (attempt ${attempt + 1}/${maxAttempts})`);
                     setTimeout(() => ensureFingerprintDashboard(attempt + 1, maxAttempts), 700);
                 } else {
                     console.error('❌ BeatPass ID injection failed after maximum attempts');
@@ -199,11 +199,11 @@
                                          document.querySelector('.text-sm.text-muted .flex.items-center.gap-4');
                     
                     if (DEBUG) {
-                        console.log(`Track metadata injection attempt ${attempt}/${maxAttempts}:`);
-                        console.log('   Track page ready:', !!trackPageReady);
-                        console.log('   Track ID available:', trackId);
-                        console.log('   Info container found:', !!infoContainer);
-                        console.log('   Current URL:', window.location.pathname);
+                        if (DEBUG) console.log(`Track metadata injection attempt ${attempt}/${maxAttempts}:`);
+                        if (DEBUG) console.log('   Track page ready:', !!trackPageReady);
+                        if (DEBUG) console.log('   Track ID available:', trackId);
+                        if (DEBUG) console.log('   Info container found:', !!infoContainer);
+                        if (DEBUG) console.log('   Current URL:', window.location.pathname);
                     }
                     
                     if (trackPageReady && trackId && infoContainer) {
@@ -217,7 +217,7 @@
                             }
                         }
                     } else if (attempt < maxAttempts) {
-                        console.warn(`⚠️ Track page prerequisites not ready, retrying in 600ms... (attempt ${attempt + 1}/${maxAttempts})`);
+                        if (DEBUG) console.warn(`⚠️ Track page prerequisites not ready, retrying in 600ms... (attempt ${attempt + 1}/${maxAttempts})`);
                         setTimeout(() => ensureMetadataInjection(attempt + 1, maxAttempts), 600);
                     } else {
                         console.error('❌ Track page metadata injection failed after maximum attempts');
@@ -264,63 +264,63 @@
     }
 
     function reinitializeBPNotes() {
-        console.log('[SPA Router] Re-initializing BP Notes...');
+        if (DEBUG) console.log('[SPA Router] Re-initializing BP Notes...');
         
         if (typeof window.bpInitAll === 'function') {
             try {
                 window.bpInitAll();
-                console.log('[SPA Router] BP Notes re-initialized successfully');
+                if (DEBUG) console.log('[SPA Router] BP Notes re-initialized successfully');
             } catch (error) {
-                console.warn('[SPA Router] BP Notes re-initialization failed:', error);
+                console.error('[SPA Router] BP Notes re-initialization failed:', error);
             }
         } else {
-            console.warn('[SPA Router] BP Notes not available for re-initialization');
+            if (DEBUG) console.warn('[SPA Router] BP Notes not available for re-initialization');
         }
     }
 
     function reinitializePricingEnhancements() {
-        console.log('[SPA Router] Re-initializing Pricing Enhancements...');
+        if (DEBUG) console.log('[SPA Router] Re-initializing Pricing Enhancements...');
         
         if (typeof window.BeatPassPricingModule !== 'undefined' && 
             typeof window.BeatPassPricingModule.initialize === 'function') {
             try {
                 window.BeatPassPricingModule.initialize();
-                console.log('[SPA Router] Pricing Enhancements re-initialized successfully');
+                if (DEBUG) console.log('[SPA Router] Pricing Enhancements re-initialized successfully');
             } catch (error) {
-                console.warn('[SPA Router] Pricing Enhancements re-initialization failed:', error);
+                console.error('[SPA Router] Pricing Enhancements re-initialization failed:', error);
             }
         } else {
-            console.warn('[SPA Router] Pricing Enhancements not available for re-initialization');
+            if (DEBUG) console.warn('[SPA Router] Pricing Enhancements not available for re-initialization');
         }
     }
 
     function reinitializeVerifiedProducers() {
-        console.log('[SPA Router] Re-initializing Verified Producers...');
+        if (DEBUG) console.log('[SPA Router] Re-initializing Verified Producers...');
         
         if (typeof window.initVerifiedProducers === 'function') {
             try {
                 window.initVerifiedProducers();
-                console.log('[SPA Router] Verified Producers re-initialized successfully');
+                if (DEBUG) console.log('[SPA Router] Verified Producers re-initialized successfully');
             } catch (error) {
-                console.warn('[SPA Router] Verified Producers re-initialization failed:', error);
+                console.error('[SPA Router] Verified Producers re-initialization failed:', error);
             }
         } else {
-            console.warn('[SPA Router] Verified Producers not available for re-initialization');
+            if (DEBUG) console.warn('[SPA Router] Verified Producers not available for re-initialization');
         }
     }
 
     function reinitializeUIHelpers() {
-        console.log('[SPA Router] Re-initializing UI Helpers...');
+        if (DEBUG) console.log('[SPA Router] Re-initializing UI Helpers...');
         
         if (typeof window.initUIHelpers === 'function') {
             try {
                 window.initUIHelpers();
-                console.log('[SPA Router] UI Helpers re-initialized successfully');
+                if (DEBUG) console.log('[SPA Router] UI Helpers re-initialized successfully');
             } catch (error) {
-                console.warn('[SPA Router] UI Helpers re-initialization failed:', error);
+                console.error('[SPA Router] UI Helpers re-initialization failed:', error);
             }
         } else {
-            console.warn('[SPA Router] UI Helpers not available for re-initialization');
+            if (DEBUG) console.warn('[SPA Router] UI Helpers not available for re-initialization');
         }
     }
 
@@ -358,17 +358,17 @@
                     const trackId = window.getTrackId ? window.getTrackId() : null;
                     
                     if (DEBUG) {
-                        console.log(`Same path check attempt ${attempt}/${maxAttempts}:`);
-                        console.log('  Core ready:', !!coreReady);
-                        console.log('  Fields injected:', !!fieldsInjected);
-                        console.log('  Track ID:', trackId);
+                        if (DEBUG) console.log(`Same path check attempt ${attempt}/${maxAttempts}:`);
+                        if (DEBUG) console.log('  Core ready:', !!coreReady);
+                        if (DEBUG) console.log('   Fields injected:', !!fieldsInjected);
+                        if (DEBUG) console.log('  Track ID:', trackId);
                     }
                     
                     if (!fieldsInjected && coreReady && trackId) {
-                        console.log('🔧 Custom fields not injected on edit page, forcing injection...');
+                        if (DEBUG) console.log('🔧 Custom fields not injected on edit page, forcing injection...');
                         try {
                             window.injectCustomFields();
-                            console.log('✅ Same-path injection completed');
+                            if (DEBUG) console.log('✅ Same-path injection completed');
                         } catch (error) {
                             console.error('❌ Same-path injection failed:', error);
                         }
@@ -386,10 +386,10 @@
         const pageType = getPageType();
         
         if (DEBUG) {
-            console.log(`🧭 Navigation detected:`);
-            console.log(`   From: ${currentPath || 'initial'}`);
-            console.log(`   To: ${newPath}`);
-            console.log(`   Page type: ${pageType}`);
+            if (DEBUG) console.log(`🧭 Navigation detected:`);
+            if (DEBUG) console.log(`   From: ${currentPath || 'initial'}`);
+            if (DEBUG) console.log(`   To: ${newPath}`);
+            if (DEBUG) console.log(`   Page type: ${pageType}`);
         }
 
         currentPath = newPath;
@@ -508,7 +508,7 @@
             // Force initialization for direct page loads
             const isDirectLoad = !currentPath || currentPath === window.location.pathname;
             if (isDirectLoad && (isEditPage() || isUploadPage())) {
-                console.log('🚀 Direct page load detected, forcing initialization...');
+                if (DEBUG) console.log('🚀 Direct page load detected, forcing initialization...');
                 setTimeout(() => handleNavigation(true), 500);
             } else {
                 setTimeout(debouncedHandleNavigation, 500);
@@ -576,26 +576,28 @@
                 const trackId = window.getTrackId ? window.getTrackId() : null;
                 const dashboardExists = document.querySelector('#fingerprint-dashboard');
                 
-                console.log(`🔧 Fallback check attempt ${attempt}/${maxAttempts}:`);
-                console.log('   Core functions ready:', !!coreReady);
-                console.log('   Fields injected:', !!fieldsInjected);
-                console.log('   Track ID available:', trackId);
-                console.log('   Dashboard exists:', !!dashboardExists);
-                console.log('   Current URL:', window.location.pathname);
+                if (DEBUG) {
+                    if (DEBUG) console.log(`🔧 Fallback check attempt ${attempt}/${maxAttempts}:`);
+                    if (DEBUG) console.log('   Core functions ready:', !!coreReady);
+                    if (DEBUG) console.log('   Fields injected:', !!fieldsInjected);
+        if (DEBUG) console.log('   Track ID available:', trackId);
+        if (DEBUG) console.log('   Dashboard exists:', !!dashboardExists);
+        if (DEBUG) console.log('   Current URL:', window.location.pathname);
+                }
                 
                 if (!fieldsInjected && coreReady && trackId) {
-                    console.log('🔧 Fallback: Injecting custom fields on edit page...');
+                    if (DEBUG) console.log('🔧 Fallback: Injecting custom fields on edit page...');
                     try {
                         window.injectCustomFields();
-                        console.log('✅ Fallback custom fields injection completed');
+                        if (DEBUG) console.log('✅ Fallback custom fields injection completed');
                         
                         // After successful custom fields injection, ensure BeatPass ID dashboard
                         setTimeout(() => {
                             if (!document.querySelector('#fingerprint-dashboard') && window.debouncedInjectFingerprintDashboard) {
-                                console.log('🔧 Fallback: Injecting BeatPass ID dashboard...');
+                                if (DEBUG) console.log('🔧 Fallback: Injecting BeatPass ID dashboard...');
                                 try {
                                     window.debouncedInjectFingerprintDashboard();
-                                    console.log('✅ Fallback dashboard injection completed');
+                                    if (DEBUG) console.log('✅ Fallback dashboard injection completed');
                                 } catch (error) {
                                     console.error('❌ Fallback dashboard injection failed:', error);
                                 }
@@ -610,25 +612,25 @@
                     }
                 } else if (fieldsInjected && !dashboardExists && coreReady && trackId) {
                     // Fields are injected but dashboard is missing
-                    console.log('🔧 Fallback: Custom fields exist but dashboard missing, injecting dashboard...');
+                    if (DEBUG) console.log('🔧 Fallback: Custom fields exist but dashboard missing, injecting dashboard...');
                     if (window.debouncedInjectFingerprintDashboard) {
                         try {
                             window.debouncedInjectFingerprintDashboard();
-                            console.log('✅ Fallback dashboard-only injection completed');
+                            if (DEBUG) console.log('✅ Fallback dashboard-only injection completed');
                         } catch (error) {
                             console.error('❌ Fallback dashboard-only injection failed:', error);
                         }
                     }
                 } else if ((!coreReady || !trackId) && attempt < maxAttempts) {
-                    console.warn(`⚠️ Prerequisites not ready, retrying in 700ms... (attempt ${attempt + 1}/${maxAttempts})`);
+                    if (DEBUG) console.warn(`⚠️ Prerequisites not ready, retrying in 700ms... (attempt ${attempt + 1}/${maxAttempts})`);
                     setTimeout(() => ensureInjection(attempt + 1, maxAttempts), 700);
                 } else if (fieldsInjected && dashboardExists) {
-                    console.log('✅ Custom fields and dashboard already injected, refreshing dashboard status...');
+                    if (DEBUG) console.log('✅ Custom fields and dashboard already injected, refreshing dashboard status...');
                     // Ensure dashboard shows correct status
                     if (window.updateDashboardContent) {
                         try {
                             window.updateDashboardContent();
-                            console.log('✅ Dashboard status refreshed');
+                            if (DEBUG) console.log('✅ Dashboard status refreshed');
                         } catch (error) {
                             console.error('❌ Dashboard status refresh failed:', error);
                         }

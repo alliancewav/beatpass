@@ -7,7 +7,7 @@
 (function() {
     'use strict';
     
-    const DEBUG = false; // Reduced logging for performance
+    const DEBUG = false; // Disabled to reduce console noise
 
     // Configuration
     const CONFIG = {
@@ -389,7 +389,7 @@
             if (pill) {
                 const startObserving = () => {
                     if (!pill || !document.body) {
-                        console.warn('[QueueEnhancement] DOM not ready for pill observer, retrying...');
+                        if (DEBUG) console.warn('[QueueEnhancement] DOM not ready for pill observer, retrying...');
                         setTimeout(startObserving, 100);
                         return;
                     }
@@ -466,16 +466,16 @@
                         setTimeout(() => {
                             const verifyEnhancement = queueContainer.querySelector('.now-playing-section');
                             if (!verifyEnhancement && retryCount < maxRetries) {
-                                console.log('Queue Enhancement: Desktop enhancement verification failed, retrying...');
+                                if (DEBUG) console.log('Queue Enhancement: Desktop enhancement verification failed, retrying...');
                                 queueContainer.removeAttribute('data-queue-enhanced');
                                 this.enhanceDesktopQueue(retryCount + 1);
                             } else if (verifyEnhancement) {
-                                console.log('Queue Enhancement: Desktop queue enhanced successfully with track:', currentTrack.title);
+                                if (DEBUG) console.log('Queue Enhancement: Desktop queue enhanced successfully with track:', currentTrack.title);
                             }
                         }, 500);
                     }
                 } else {
-                    console.log('Queue Enhancement: No current track found for desktop queue');
+                    if (DEBUG) console.log('Queue Enhancement: No current track found for desktop queue');
                     // Still mark as enhanced to prevent infinite retries
                     queueContainer.dataset.queueEnhanced = 'true';
                 }
@@ -546,16 +546,16 @@
                         setTimeout(() => {
                             const verifyEnhancement = queueContainer.querySelector('.now-playing-section');
                             if (!verifyEnhancement && retryCount < maxRetries) {
-                                console.log('Queue Enhancement: Mobile enhancement verification failed, retrying...');
+                                if (DEBUG) console.log('Queue Enhancement: Mobile enhancement verification failed, retrying...');
                                 queueContainer.removeAttribute('data-queue-enhanced');
                                 this.enhanceMobileQueue(retryCount + 1);
                             } else if (verifyEnhancement) {
-                                console.log('Queue Enhancement: Mobile queue enhanced successfully with track:', currentTrack.title);
+                                if (DEBUG) console.log('Queue Enhancement: Mobile queue enhanced successfully with track:', currentTrack.title);
                             }
                         }, 500);
                     }
                 } else {
-                    console.log('Queue Enhancement: No current track found for mobile queue');
+                    if (DEBUG) console.log('Queue Enhancement: No current track found for mobile queue');
                     // Still mark as enhanced to prevent infinite retries
                     queueContainer.dataset.queueEnhanced = 'true';
                 }
@@ -991,10 +991,10 @@
                 if (appReady && attempts > 12) { // Wait longer before proceeding
                     // Extended wait for fresh loads to ensure React components are fully rendered
                     const waitTime = attempts < 30 ? 2000 : 1500; // Longer wait for early attempts
-                    console.log(`Queue Enhancement: React app detected after ${attempts} attempts, waiting ${waitTime}ms for stabilization`);
+                    if (DEBUG) console.log(`Queue Enhancement: React app detected after ${attempts} attempts, waiting ${waitTime}ms for stabilization`);
                     setTimeout(resolve, waitTime);
                 } else if (attempts >= maxAttempts) {
-                    console.log('Queue Enhancement: Timeout waiting for React app after 40s, proceeding anyway');
+                    if (DEBUG) console.log('Queue Enhancement: Timeout waiting for React app after 40s, proceeding anyway');
                     resolve(); // Fallback after timeout
                 } else {
                     setTimeout(checkForApp, 200);
@@ -1016,7 +1016,7 @@
                 clearTimeout(stabilityTimer);
                 stabilityTimer = setTimeout(() => {
                     observer?.disconnect();
-                    console.log(`Queue Enhancement: DOM stable after ${mutationCount} mutations`);
+                    if (DEBUG) console.log(`Queue Enhancement: DOM stable after ${mutationCount} mutations`);
                     resolve();
                 }, 500); // Wait for 500ms of no mutations (longer for fresh loads)
             };
@@ -1063,7 +1063,7 @@
             setTimeout(() => {
                 observer?.disconnect();
                 clearTimeout(stabilityTimer);
-                console.log(`Queue Enhancement: DOM stability timeout after ${timeout}ms, proceeding anyway`);
+                if (DEBUG) console.log(`Queue Enhancement: DOM stability timeout after ${timeout}ms, proceeding anyway`);
                 resolve();
             }, timeout);
         });
@@ -1072,7 +1072,7 @@
     // Initialize with proper timing and retry logic
     async function initializeEnhancement() {
         try {
-            console.log('Queue Enhancement: Starting initialization...');
+            if (DEBUG) console.log('Queue Enhancement: Starting initialization...');
             
             // Use the new InitializationManager
             InitializationManager.init();
@@ -1094,7 +1094,7 @@
     window.addEventListener('load', () => {
         setTimeout(() => {
             if (!InitializationManager.state.isInitialized) {
-                console.log('Queue Enhancement: Window load fallback triggered');
+                if (DEBUG) console.log('Queue Enhancement: Window load fallback triggered');
                 InitializationManager.init();
             }
         }, 1000);
@@ -1103,7 +1103,7 @@
     // Enhanced navigation handling with better state preservation
     function handleNavigation() {
         // Legacy function - now handled by InitializationManager
-        console.log('Queue Enhancement: Navigation handling delegated to InitializationManager');
+        if (DEBUG) console.log('Queue Enhancement: Navigation handling delegated to InitializationManager');
     }
 
     // Export for potential external use

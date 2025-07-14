@@ -53,7 +53,7 @@
                 
                 return result;
             } catch (error) {
-                console.warn('API get error:', error);
+                if (DEBUG) console.warn('API get error:', error);
                 return {};
             }
         },
@@ -148,6 +148,11 @@
 
     // Utility selectors
     function getProfileImage() {
+        // Check if we're on an artist profile page first
+        if (!isArtistProfilePage()) {
+            return null; // Don't look for profile images on non-artist pages
+        }
+        
         // Try to select the main profile image only in the profile header
         let container = document.querySelector('.flex.items-center.gap-12.mb-12, .flex.items-center.gap-12');
         if (container) {
@@ -160,6 +165,12 @@
         }
         // Fallback: look for a large, rounded image anywhere in the DOM
         let img = document.querySelector('img.w-256.h-256.rounded-full, img.rounded-full, img[alt*="Profile"], img[alt*="profile"]');
+        
+        // Additional fallback: look for any profile-like image
+        if (!img) {
+            img = document.querySelector('img[src*="profile"], img[src*="avatar"], img.rounded-full');
+        }
+        
         return img || null;
     }
     function getButtonRow() {
@@ -1120,14 +1131,14 @@
                 const capturedViewerCount = viewerCount || 0;
                 editBtn.onclick = (e) => {
                     e.stopPropagation();
-                    console.log('[BP] Edit button clicked in showBPNoteModal');
+                    if (DEBUG) console.log('[BP] Edit button clicked in showBPNoteModal');
                     let modal = document.getElementById(MODAL_ID);
                     if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
                     // Ensure all variables are safely defined
                     const safeCreatedAt = (typeof createdAt !== 'undefined') ? createdAt : Date.now();
                     const safeIsLoggedIn = (typeof isLoggedIn !== 'undefined') ? isLoggedIn : isUserLoggedIn();
                     const safeAvatarUrl = (typeof avatarUrl !== 'undefined') ? avatarUrl : (getProfileImage() ? getProfileImage().src : '');
-                    console.log('[BP] Opening edit modal with:', {currentMsg, capturedGradient, capturedViewerCount});
+                    if (DEBUG) console.log('[BP] Opening edit modal with:', {currentMsg, capturedGradient, capturedViewerCount});
                     showBPNoteModal({
                         message: currentMsg,
                         editable: true,
@@ -1263,7 +1274,7 @@
 
     // Vibrant, engaging note banner with lord-icon and gradient picker
     async function render(attempt = 0) {
-        console.log('[BP] render() called, attempt', attempt);
+        if (DEBUG) console.log('[BP] render() called, attempt', attempt);
         
         // Use centralized state management if available
         const stateManager = window.BPNotesInitManager;
@@ -1316,10 +1327,11 @@
         const profileImg = getProfileImage();
         if (!profileImg) {
             removeAllStoryRings();
-            if (attempt < 15) {
-                setTimeout(() => render(attempt + 1), 200);
+            if (attempt < 5) { // Reduced from 15 to 5 attempts
+                setTimeout(() => render(attempt + 1), 500); // Increased delay from 200ms to 500ms
             } else {
-                console.warn('[BP] render() failed to find profile image after multiple attempts');
+                console.warn('[BP] render() failed to find profile image after multiple attempts, stopping retries');
+                // Stop the infinite loop by not calling render again
             }
             return;
         }
@@ -1351,7 +1363,7 @@
             currentState.msg === msg &&
             currentState.editable === editable
         ) {
-            console.log('[BP] render() end (no change)');
+            if (DEBUG) console.log('[BP] render() end (no change)');
             return;
         }
 
@@ -1777,7 +1789,7 @@
         }
         
         // Early return for producer dashboard - no need for full banner
-        console.log('[BP] render() end (producer dashboard)');
+        if (DEBUG) console.log('[BP] render() end (producer dashboard)');
         return;
     }
 
@@ -1908,25 +1920,25 @@
         document.head.appendChild(style);
     }
 
-    // Re-render on navigation or DOM changes
+    // Re-render on navigation or DOM changes (more selective)
     const re = debounceBP(() => {
-        if (window._bpNotesRendering) return;
-        setTimeout(render, 0);
-    }, 300);
-    ['load', 'spa-route-change', 'popstate'].forEach(ev => window.addEventListener(ev, re));
-    
-    // Wait for document.body to be available before setting up observer
-    function setupMutationObserver() {
-        const targetNode = document.body || document.documentElement;
-        if (!targetNode) {
-            if (DEBUG) console.warn('[BeatPass] DOM not ready for bp-notes observer, retrying...');
-            setTimeout(setupMutationObserver, 100);
+        if (window._bpNotesRendering) {
+            if (DEBUG) console.log('[BP] Skipping render - already rendering');
             return;
         }
-        new MutationObserver(re).observe(targetNode, { childList: true, subtree: true });
-        if (DEBUG) console.log('[BeatPass] bp-notes observer setup complete');
-    }
-    setupMutationObserver();
+        // Only trigger on artist profile pages to prevent unnecessary renders
+        if (isArtistProfilePage()) {
+            setTimeout(render, 0);
+        }
+    }, 1000); // Further increased debounce time to 1000ms
+    ['load', 'spa-route-change', 'popstate'].forEach(ev => window.addEventListener(ev, re));
+    
+    // Disabled MutationObserver to prevent render loops - only rely on navigation events
+    // function setupMutationObserver() {
+    //     // MutationObserver disabled to prevent infinite render loops
+    //     if (DEBUG) console.log('[BeatPass] MutationObserver disabled to prevent render loops');
+    // }
+    // setupMutationObserver();
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
     else render();
 
@@ -2014,7 +2026,7 @@
                     const profileOwner = getProfileName();
                     const isOwner = currentUser === profileOwner;
                     
-                    console.log('[BP] Opening timeline modal with', notes.length, 'notes');
+                    if (DEBUG) console.log('[BP] Opening timeline modal with', notes.length, 'notes');
                     if (typeof window.showTimelineModal === 'function') {
                         window.showTimelineModal({
                             notes: notes,
@@ -2022,7 +2034,7 @@
                             avatarUrl: img.src,
                             isOwner: isOwner,
                             onAddNote: isOwner ? () => {
-                                console.log('[BP] Opening add note modal from timeline');
+                                if (DEBUG) console.log('[BP] Opening add note modal from timeline');
                                 showBPNoteModal({
                                     message: '',
                                     editable: true,
@@ -2104,7 +2116,7 @@
     // Auto-cleanup expired notes every 5 minutes
     setInterval(() => {
         if (isArtistProfilePage() && typeof render === 'function') {
-            console.log('[BP] Auto-cleanup: checking for expired notes');
+            if (DEBUG) console.log('[BP] Auto-cleanup: checking for expired notes');
             render();
         }
     }, 5 * 60 * 1000); // 5 minutes
@@ -3095,8 +3107,30 @@
 })();
 
 // ============================================================
+// Utility Functions (Global Scope)
+// ============================================================
+
+// Debounce utility - moved to global scope for accessibility
+function debounceBP(fn, delay) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
+// Helper: Extract first color stop from a linear-gradient string
+function getFirstGradientColor(gradient) {
+    const match = gradient.match(/#([0-9a-fA-F]{3,8})/);
+    return match ? match[0] : '#444';
+}
+
+// ============================================================
 // BP Notes Initialization Manager
 // ============================================================
+(function() {
+    const DEBUG = false; // Reduced logging for performance
+    
 window.BPNotesInitManager = {
     initialized: false,
     initializing: false,
@@ -3106,12 +3140,12 @@ window.BPNotesInitManager = {
     
     init() {
         if (this.initialized || this.initializing) {
-            console.log('[BP] BPNotesInitManager: Already initialized or initializing');
+            if (DEBUG) console.log('[BP] BPNotesInitManager: Already initialized or initializing');
             return Promise.resolve();
         }
         
         this.initializing = true;
-        console.log('[BP] BPNotesInitManager: Starting initialization');
+        if (DEBUG) console.log('[BP] BPNotesInitManager: Starting initialization');
         
         try {
             // Initialize core functions
@@ -3130,7 +3164,7 @@ window.BPNotesInitManager = {
             
             this.initialized = true;
             this.initializing = false;
-            console.log('[BP] BPNotesInitManager: Initialization completed');
+            if (DEBUG) console.log('[BP] BPNotesInitManager: Initialization completed');
             
             return Promise.resolve();
         } catch (error) {
@@ -3141,23 +3175,7 @@ window.BPNotesInitManager = {
     },
     
     loadRequiredLibraries() {
-        // Load Quill if not already loaded
-        if (!window.Quill) {
-            const quillScript = document.createElement('script');
-            quillScript.src = 'https://cdn.quilljs.com/1.3.7/quill.min.js';
-            document.head.appendChild(quillScript);
-            const quillStyle = document.createElement('link');
-            quillStyle.rel = 'stylesheet';
-            quillStyle.href = 'https://cdn.quilljs.com/1.3.7/quill.snow.css';
-            document.head.appendChild(quillStyle);
-        }
-        
-        // Load DOMPurify if not already loaded
-        if (!window.DOMPurify) {
-            const purifyScript = document.createElement('script');
-            purifyScript.src = 'https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js';
-            document.head.appendChild(purifyScript);
-        }
+        // Quill and DOMPurify dependencies removed as requested
     },
     
     injectStyles() {
@@ -3203,7 +3221,7 @@ window.BPNotesInitManager = {
 
 // Simplified initialization - delegates to BPNotesInitManager
 function bpInitAll() {
-    console.log('[BP] bpInitAll() called - delegating to BPNotesInitManager');
+    if (DEBUG) console.log('[BP] bpInitAll() called - delegating to BPNotesInitManager');
     if (window.BPNotesInitManager) {
         window.BPNotesInitManager.init();
     } else {
@@ -3216,7 +3234,7 @@ function bpInitAll() {
 // Initialization is now handled by BPNotesInitManager
 // These listeners are kept for backward compatibility
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[BP] DOMContentLoaded: delegating to BPNotesInitManager');
+    if (DEBUG) console.log('[BP] DOMContentLoaded: delegating to BPNotesInitManager');
     if (window.BPNotesInitManager) {
         window.BPNotesInitManager.init();
     } else {
@@ -3225,7 +3243,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('load', () => {
-    console.log('[BP] window.load: delegating to BPNotesInitManager');
+    if (DEBUG) console.log('[BP] window.load: delegating to BPNotesInitManager');
     if (window.BPNotesInitManager) {
         window.BPNotesInitManager.init();
     } else {
@@ -3234,7 +3252,7 @@ window.addEventListener('load', () => {
 });
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    console.log('[BP] Immediate init: delegating to BPNotesInitManager');
+    if (DEBUG) console.log('[BP] Immediate init: delegating to BPNotesInitManager');
     if (window.BPNotesInitManager) {
         window.BPNotesInitManager.init();
     } else {
@@ -3242,26 +3260,11 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
     }
 }
 
-// Helper: Extract first color stop from a linear-gradient string
-function getFirstGradientColor(gradient) {
-    const match = gradient.match(/#([0-9a-fA-F]{3,8})/);
-    return match ? match[0] : '#444';
-}
-
-
-
 // CSS injection and library loading is now handled by BPNotesInitManager
-
-// Debounce utility - kept for backward compatibility
-function debounceBP(fn, delay) {
-    let timeout;
-    return function(...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => fn.apply(this, args), delay);
-    };
-}
 
 // Resize event handling is now managed by BPNotesInitManager
 window.addEventListener('resize', debounceBP(() => {
     if (typeof render === 'function') render();
 }, 300));
+
+})(); // Close BPNotesInitManager IIFE

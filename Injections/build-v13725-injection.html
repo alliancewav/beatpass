@@ -1,68 +1,94 @@
-<script>
-(function() {
-    'use strict';
-    
-    const basePath = './js-modules/Build V13.7.25/';
-    const cacheBuster = Date.now() + Math.random(); // Enhanced cache busting for development
-    
-    const modules = [
-        'UI-helpers.js',
-        'BeatPass Optimized Integration/BeatPassIntegration.js',
-        'BeatPass Optimized Integration/ad-removal.js',
-        'BeatPass Optimized Integration/cheque-button-removal.js',
-        'BeatPass Optimized Integration/coverart-updater.js',
-        'BeatPass Optimized Integration/immersive-styling.js',
-        'BeatPass Optimized Integration/openwidget-integration.js',
-        'BeatPass Optimized Integration/webpushr-integration.js',
-        'Custom Fields/Consolidated/beatpass-core.js',
-        'Custom Fields/Consolidated/beatpass-features.js',
-        'Custom Fields/Consolidated/beatpass-ui-components.js',
-        'Custom Fields/Consolidated/beatpass-banners.js',
-        'Custom Fields/Consolidated/beatpass-spa-router.js',
-        'pricing-enhancements.js',
-        'verified-producers.js',
-        'bp-notes.js',
-        'cd-spin.js',
-        'queue-enhancement.js'
-    ];
-    
-    // Sequential script loader with cache busting
-    function loadScript(src) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = `${basePath}${src}?v=${cacheBuster}`;
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    }
-    
-    // Load modules sequentially
-    async function loadModules() {
-        console.log('🚀 Loading BeatPass Build V13.7.25...');
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BeatPass Ultra-Fast Injection</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <script>
+    // Ultra-Fast BeatPass Injection - Maximum Performance
+    (function() {
+        'use strict';
         
-        for (const module of modules) {
-            try {
-                console.log(`🔄 Loading: ${module}`);
-                await loadScript(module);
-                console.log(`✅ Loaded: ${module}`);
-            } catch (error) {
-                console.error(`❌ Failed to load: ${module}`, error);
-            }
+        // Skip if already injected
+        if (window.BeatPassUltraInjected) return;
+        window.BeatPassUltraInjected = true;
+        
+        const BASE_PATH = 'https://open.beatpass.ca/js-modules/Build%20V13.7.25/'; // Remote module path
+        const VERSION = Date.now(); // Cache busting
+        
+        // Minimal registry
+        window.BP = window.BP || { loaded: new Set(), ready: false };
+        
+        // Ultra-fast script loader with preloading
+        function loadScript(src, name) {
+            return new Promise((resolve) => {
+                const script = document.createElement('script');
+                script.src = BASE_PATH + src + '?v=' + VERSION;
+                script.async = true;
+                script.onload = () => {
+                    window.BP.loaded.add(name);
+                    resolve();
+                };
+                script.onerror = () => resolve(); // Continue on error
+                document.head.appendChild(script);
+            });
         }
-    }
-    
-    loadModules();
-    
-    // Global status
-    window.BeatpassSystemUsed = 'v13725';
-    window.BeatpassSystemStatus = {
-        getCurrentSystem: () => 'v13725',
-        getSystemName: () => 'Build V13.7.25',
-        getBuildVersion: () => 'V13.7.25',
-        getModuleCount: () => modules.length
-    };
-    
-    console.log('✅ BeatPass injection initiated!');
-})();
-</script>
+        
+        // Critical path - load only essential modules in dependency order
+        const criticalModules = [
+            ['UI-helpers.js', 'ui-helpers'],
+            ['Custom Fields/Consolidated/beatpass-core.js', 'core']
+        ];
+        
+        // Secondary critical modules - load after core dependencies
+        const secondaryCriticalModules = [
+            ['bp-notes.js', 'notes']
+        ];
+        
+        // Non-critical modules - load after critical
+        const nonCriticalModules = [
+            ['Custom Fields/Consolidated/beatpass-features.js', 'features'],
+            ['Custom Fields/Consolidated/beatpass-spa-router.js', 'router'],
+            ['Custom Fields/Consolidated/beatpass-ui-components.js', 'ui-components'],
+            ['Custom Fields/Consolidated/beatpass-banners.js', 'banners'],
+            ['cd-spin.js', 'cd-spin'],
+            ['queue-enhancement.js', 'queue'],
+            ['pricing-enhancements.js', 'pricing'],
+            ['verified-producers.js', 'verified']
+        ];
+        
+        // Ultra-fast injection with proper dependency order
+        async function inject() {
+            const start = performance.now();
+            
+            // Load core dependencies first (UI-helpers, beatpass-core)
+            await Promise.all(criticalModules.map(([src, name]) => loadScript(src, name)));
+            
+            // Load secondary critical modules that depend on core (bp-notes)
+            await Promise.all(secondaryCriticalModules.map(([src, name]) => loadScript(src, name)));
+            
+            // Initialize core immediately after all critical modules are loaded
+            if (window.BPNotesInitManager?.init) {
+                window.BPNotesInitManager.init();
+            }
+            
+            // Load non-critical modules in background
+            Promise.all(nonCriticalModules.map(([src, name]) => loadScript(src, name)))
+                .then(() => {
+                    window.BP.ready = true;
+                    console.log(`[BP] Ultra-fast injection: ${(performance.now() - start).toFixed(1)}ms`);
+                });
+        }
+        
+        // Start immediately
+        if (document.readyState !== 'loading') {
+            inject();
+        } else {
+            document.addEventListener('DOMContentLoaded', inject);
+        }
+        
+    })();
+    </script>
+</body>
+</html>

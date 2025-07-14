@@ -2,7 +2,7 @@
 // 8. Subtitle Injection for Various Pages
 // ============================================================
 (function() {
-    const DEBUG = false; // Reduced logging for performance
+    const DEBUG = false; // Disabled to reduce console noise
     // Centralized subtitle manager to prevent conflicts
     let isProcessing = false;
     let currentPath = null;
@@ -217,7 +217,7 @@
             dataAttribute = "data-trending-subtitle";
         } else if (path === "/pricing") {
             // Skip pricing page completely - the carousel handles its own title and subtitle
-            console.log('Skipping pricing page subtitle - carousel will handle it');
+            if (DEBUG) console.log('Skipping pricing page subtitle - carousel will handle it');
             return false;
         } else if (path.startsWith("/channel/channel-restriction-display-name-trending-beats/")) {
             subtitleText = "Discover chart-topping beats, loved by artists and creators worldwide.";
@@ -238,7 +238,7 @@
             // Double-check that no subtitle with this data attribute already exists
             const existingSubtitle = document.querySelector(`[${dataAttribute}='true']`);
             if (existingSubtitle) {
-                console.log('Subtitle already exists, skipping creation:', dataAttribute);
+                if (DEBUG) console.log('Subtitle already exists, skipping creation:', dataAttribute);
                 return true;
             }
             
@@ -266,8 +266,10 @@
             "a[href^='/channel/genres']"
         );
         
-        console.log('Section anchors found:', anchors.length);
-        anchors.forEach(anchor => console.log('Anchor href:', anchor.getAttribute("href")));
+        if (DEBUG) {
+            console.log('Section anchors found:', anchors.length);
+            anchors.forEach(anchor => console.log('Anchor href:', anchor.getAttribute("href")));
+        }
         
         const SECTION_SUBTITLES = {
             "channel-restriction-display-name-trending-beats": "Discover chart-topping beats, loved by artists and creators worldwide.",
@@ -285,13 +287,13 @@
             const parts = anchor.getAttribute("href").split("/").filter(Boolean);
             const key = parts[1];
             const text = SECTION_SUBTITLES[key];
-            console.log('Processing anchor with key:', key, 'text:', text);
+            if (DEBUG) console.log('Processing anchor with key:', key, 'text:', text);
             
             if (!text) return;
             
             const container = anchor.closest("div.mb-50") || anchor.closest("div.pb-24");
             if (!container) {
-                console.log('No container found for anchor:', anchor.getAttribute("href"));
+                if (DEBUG) console.log('No container found for anchor:', anchor.getAttribute("href"));
                 return;
             }
             
@@ -316,20 +318,20 @@
             if (titleContainer) {
                 titleContainer.insertAdjacentElement("afterend", p);
                 addedCount++;
-                console.log('Section subtitle added for:', key);
+                if (DEBUG) console.log('Section subtitle added for:', key);
             } else {
-                console.log('No title container found for:', key);
+                if (DEBUG) console.log('No title container found for:', key);
             }
         });
         
-        console.log('Total section subtitles added:', addedCount);
+        if (DEBUG) console.log('Total section subtitles added:', addedCount);
         return addedCount > 0;
     }
 
     // Section 1: Dynamic Genre Subtitle
     function isGenrePage() {
         const isGenre = /^\/channel\/genre\//.test(window.location.pathname);
-        console.log('Checking if genre page:', window.location.pathname, 'Result:', isGenre);
+        if (DEBUG) console.log('Checking if genre page:', window.location.pathname, 'Result:', isGenre);
         return isGenre;
     }
     const GENRE_DESCRIPTIONS = {
@@ -357,9 +359,11 @@
         const desc = GENRE_DESCRIPTIONS[slug];
         
         // Debug logging
-        console.log('Genre page detected:', window.location.pathname);
-        console.log('Extracted slug:', slug);
-        console.log('Found description:', desc ? 'Yes' : 'No');
+        if (DEBUG) {
+            console.log('Genre page detected:', window.location.pathname);
+            console.log('Extracted slug:', slug);
+            console.log('Found description:', desc ? 'Yes' : 'No');
+        }
         
         if (!desc) return false;
         
@@ -383,7 +387,7 @@
         p.textContent = desc;
         h1.insertAdjacentElement("afterend", p);
         
-        console.log('Genre subtitle added successfully');
+        if (DEBUG) console.log('Genre subtitle added successfully');
         return true;
     }
 
@@ -430,7 +434,7 @@
                 if (retryCount >= maxRetries) return;
                 
                 if (attemptSubtitles()) {
-                    console.log('Subtitles loaded successfully after', retryCount, 'retries');
+                    if (DEBUG) console.log('Subtitles loaded successfully after', retryCount, 'retries');
                     return;
                 }
                 
@@ -530,7 +534,7 @@
             const originalReplaceState = history.replaceState;
             
             function handleNavigation(eventType) {
-                console.log('Navigation detected:', eventType, window.location.pathname);
+                if (DEBUG) console.log('Navigation detected:', eventType, window.location.pathname);
                 // Reset state on navigation
                 isProcessing = false;
                 currentPath = null;
@@ -601,7 +605,7 @@
                 const shouldUpdate = pathChanged && timeSinceLastUpdate > 3000; // Increased from 2000ms to 3000ms
                 
                 if (shouldUpdate) {
-                    console.log('Periodic check detected path change:', {
+                    if (DEBUG) console.log('Periodic check detected path change:', {
                         oldPath: lastKnownPath,
                         newPath: currentPagePath,
                         timeSinceLastUpdate: timeSinceLastUpdate
@@ -658,7 +662,7 @@
 
     // Expose global initialization function for SPA routing
     window.initUIHelpers = function() {
-        console.log('[UI Helpers] Re-initializing for SPA navigation...');
+        if (DEBUG) console.log('[UI Helpers] Re-initializing for SPA navigation...');
         
         // Reset processing state
         isProcessing = false;

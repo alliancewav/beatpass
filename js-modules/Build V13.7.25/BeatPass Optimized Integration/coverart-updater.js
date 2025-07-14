@@ -4,7 +4,9 @@
 (function() {
     'use strict';
     
-    console.log("[CoverArtUpdater] Script executing.");
+    const DEBUG = false;
+    
+    if (DEBUG) console.log("[CoverArtUpdater] Script executing.");
 
     function isBackstagePage() {
         return window.location.href.match(/\/backstage\/(upload|tracks\/\d+\/edit)/);
@@ -14,9 +16,9 @@
     setInterval(() => {
         if (window.location.href !== lastURL) {
             lastURL = window.location.href;
-            console.log("[CoverArtUpdater] URL changed to:", lastURL);
+            if (DEBUG) console.log("[CoverArtUpdater] URL changed to:", lastURL);
             if (isBackstagePage()) {
-                console.log("[CoverArtUpdater] Backstage page detected via URL polling. Reinitializing updater.");
+                if (DEBUG) console.log("[CoverArtUpdater] Backstage page detected via URL polling. Reinitializing updater.");
                 initCoverArtUpdater();
             }
         }
@@ -36,11 +38,11 @@
     })(window.history);
 
     window.addEventListener('popstate', () => {
-        console.log("[CoverArtUpdater] popstate detected.");
+        if (DEBUG) console.log("[CoverArtUpdater] popstate detected.");
         setTimeout(initCoverArtUpdater, 100);
     });
     window.addEventListener('locationchange', () => {
-        console.log("[CoverArtUpdater] locationchange detected.");
+        if (DEBUG) console.log("[CoverArtUpdater] locationchange detected.");
         setTimeout(initCoverArtUpdater, 100);
     });
 
@@ -48,10 +50,10 @@
         return new Promise(resolve => {
             let el = document.querySelector(selector);
             if (el) {
-                console.log("[CoverArtUpdater] Found element for selector:", selector);
+                if (DEBUG) console.log("[CoverArtUpdater] Found element for selector:", selector);
                 return resolve(el);
             }
-            console.log("[CoverArtUpdater] Persistently waiting for element with selector:", selector);
+            if (DEBUG) console.log("[CoverArtUpdater] Persistently waiting for element with selector:", selector);
             const startObserving = () => {
                 const targetNode = document.body || document.documentElement;
                 if (!targetNode) {
@@ -63,7 +65,7 @@
                 const obs = new MutationObserver(() => {
                     el = document.querySelector(selector);
                     if (el) {
-                        console.log("[CoverArtUpdater] Found element after waiting for selector:", selector);
+                        if (DEBUG) console.log("[CoverArtUpdater] Found element after waiting for selector:", selector);
                         obs.disconnect();
                         resolve(el);
                     }
@@ -182,16 +184,16 @@
     async function getGenreItemsContainer() {
         const input = document.querySelector('input[name="genres"]');
         if (!input) {
-            console.warn("[CoverArtUpdater] Genre input field not found.");
+            if (DEBUG) console.warn("[CoverArtUpdater] Genre input field not found.");
             return null;
         }
         const group = input.closest('div[role="group"]');
         if (!group) {
-            console.warn("[CoverArtUpdater] Genre group container not found.");
+            if (DEBUG) console.warn("[CoverArtUpdater] Genre group container not found.");
             return null;
         }
         const container = group.querySelector('div.flex.flex-wrap.items-center.gap-8');
-        if (!container) console.warn("[CoverArtUpdater] Genre items container not found within group.");
+        if (!container && DEBUG) console.warn("[CoverArtUpdater] Genre items container not found within group.");
         return container;
     }
 
@@ -206,23 +208,23 @@
                     coverInput.type = "hidden";
                     coverInput.name = "cover_art_url";
                     form.appendChild(coverInput);
-                    console.log("[CoverArtUpdater] Created hidden cover_art_url field.");
+                    if (DEBUG) console.log("[CoverArtUpdater] Created hidden cover_art_url field.");
                 } else {
-                    console.warn("[CoverArtUpdater] Form not found for cover_art_url field.");
+                    if (DEBUG) console.warn("[CoverArtUpdater] Form not found for cover_art_url field.");
                     return;
                 }
             } else {
-                console.warn("[CoverArtUpdater] Genre input not found; cannot update cover_art_url.");
+                if (DEBUG) console.warn("[CoverArtUpdater] Genre input not found; cannot update cover_art_url.");
                 return;
             }
         }
         coverInput.value = url;
-        console.log("[CoverArtUpdater] Updated cover_art_url field with URL:", url);
+        if (DEBUG) console.log("[CoverArtUpdater] Updated cover_art_url field with URL:", url);
     }
 
     async function simulateFileUpload(url) {
         try {
-            console.log("[CoverArtUpdater] Simulating file upload for URL:", url);
+            if (DEBUG) console.log("[CoverArtUpdater] Simulating file upload for URL:", url);
             const res = await fetch(url);
             const blob = await res.blob();
             const filename = url.split("/").pop();
@@ -233,9 +235,9 @@
             if (fileInput) {
                 fileInput.files = dt.files;
                 fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-                console.log("[CoverArtUpdater] Simulated file upload with file:", file);
+                if (DEBUG) console.log("[CoverArtUpdater] Simulated file upload with file:", file);
             } else {
-                console.warn("[CoverArtUpdater] File input element not found.");
+                if (DEBUG) console.warn("[CoverArtUpdater] File input element not found.");
             }
         } catch (err) {
             console.error("[CoverArtUpdater] Error simulating file upload:", err);
@@ -244,21 +246,21 @@
 
     let lastCoverUrl = "";
     const updateArtworkPreviewDebounced = debounceFunc(async function() {
-        console.log("[CoverArtUpdater] updateArtworkPreview called.");
+        if (DEBUG) console.log("[CoverArtUpdater] updateArtworkPreview called.");
         const artworkContainer = await waitForElement('.w-full.md\\:w-224.aspect-square.rounded.group');
         if (!artworkContainer) {
-            console.warn("[CoverArtUpdater] Artwork container not found.");
+            if (DEBUG) console.warn("[CoverArtUpdater] Artwork container not found.");
             return;
         }
 
         const container = await getGenreItemsContainer();
         if (!container) {
-            console.warn("[CoverArtUpdater] Genre items container not found.");
+            if (DEBUG) console.warn("[CoverArtUpdater] Genre items container not found.");
             return;
         }
 
         const items = Array.from(container.children);
-        console.log("[CoverArtUpdater] Genre items:", items.map(i => i.textContent.trim()));
+        if (DEBUG) console.log("[CoverArtUpdater] Genre items:", items.map(i => i.textContent.trim()));
 
         if (items.length === 0) {
             const blank = "https://open.beatpass.ca/ediscs/Blank.webp";
@@ -269,30 +271,30 @@
         }
 
         let selected = items.slice(0, 2).map(i => i.textContent.trim());
-        console.log("[CoverArtUpdater] Selected genres:", selected);
+        if (DEBUG) console.log("[CoverArtUpdater] Selected genres:", selected);
 
         let baseNames = selected.map(g => genreBaseMap[g] || g);
-        console.log("[CoverArtUpdater] Base names:", baseNames);
+        if (DEBUG) console.log("[CoverArtUpdater] Base names:", baseNames);
 
         let newUrl = "";
         if (baseNames.length >= 2) {
             const sorted = sortBaseNames(baseNames);
-            console.log("[CoverArtUpdater] Sorted base names:", sorted);
+            if (DEBUG) console.log("[CoverArtUpdater] Sorted base names:", sorted);
             const comboKey = sorted.map(n => combineName(n)).join(" ");
-            console.log("[CoverArtUpdater] Combination key:", comboKey);
+            if (DEBUG) console.log("[CoverArtUpdater] Combination key:", comboKey);
             if (coverArtLinks[comboKey]) {
                 const picks = coverArtLinks[comboKey];
                 newUrl = `https://open.beatpass.ca/ediscs/${encodeURIComponent(picks[Math.floor(Math.random()*picks.length)])}`;
-                console.log("[CoverArtUpdater] Combination key found:", comboKey);
+                if (DEBUG) console.log("[CoverArtUpdater] Combination key found:", comboKey);
             } else {
-                console.log("[CoverArtUpdater] No valid combination key found. Falling back to single genre.");
+                if (DEBUG) console.log("[CoverArtUpdater] No valid combination key found. Falling back to single genre.");
             }
         }
         if (!newUrl) {
             const fallback = baseNames[Math.floor(Math.random() * baseNames.length)];
-            console.log("[CoverArtUpdater] Fallback key:", fallback);
+            if (DEBUG) console.log("[CoverArtUpdater] Fallback key:", fallback);
             if (!coverArtLinks[fallback]) {
-                console.warn("[CoverArtUpdater] No cover art mapping found for fallback key:", fallback);
+                if (DEBUG) console.warn("[CoverArtUpdater] No cover art mapping found for fallback key:", fallback);
                 return;
             }
             const picks = coverArtLinks[fallback];

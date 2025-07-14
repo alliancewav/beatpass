@@ -96,7 +96,7 @@ document.addEventListener('contextmenu', event => {
 // ============================================================
 // 3. Common Utility & Helper Functions
 // ============================================================
-const DEBUG = false;
+const DEBUG = false; // Disabled to reduce console noise
 
 function logDebug(...args) {
     if (DEBUG) console.log(...args);

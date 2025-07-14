@@ -5,6 +5,8 @@
 (function() {
     'use strict';
     
+    const DEBUG = false; // Disabled to reduce console noise
+    
     // ---------------------------
     // Core Utility Functions
     // ---------------------------
@@ -148,7 +150,7 @@
                    document.querySelector('input[placeholder*="Name"]');
         
         const trackName = inp ? inp.value.trim() : '';
-        console.log("🏷️ getTrackName() found:", trackName);
+        if (DEBUG) console.log("🏷️ getTrackName() found:", trackName);
         return trackName;
     }
     
@@ -265,7 +267,7 @@
         
         // Auto-initialization
         init: function() {
-            console.log('[BeatPassUtilities] Standalone utilities module loaded');
+            if (DEBUG) console.log('[BeatPassUtilities] Standalone utilities module loaded');
             ensureAnimationStyles();
         }
     };
@@ -303,6 +305,8 @@
 // ============================================================
 (function() {
     'use strict';
+    
+    const DEBUG = false; // Disabled to reduce console noise
     
     // ---------------------------
     // Constants and Configuration
@@ -425,7 +429,7 @@
         const maxRetries = isUpload ? MAX_RETRIES_UPLOAD : MAX_RETRIES_TRACK;
         const retryDelay = isUpload ? RETRY_DELAY : RETRY_DELAY_TRACK;
         
-        console.log(`[DataManager] Submitting ${isUpload ? 'upload' : 'track'} data:`, data);
+        if (DEBUG) console.log(`[DataManager] Submitting ${isUpload ? 'upload' : 'track'} data:`, data);
         
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -438,7 +442,7 @@
                     }
                 });
                 
-                console.log(`[DataManager] Data submitted successfully on attempt ${attempt}:`, response);
+                if (DEBUG) console.log(`[DataManager] Data submitted successfully on attempt ${attempt}:`, response);
                 return response;
                 
             } catch (error) {
@@ -469,7 +473,7 @@
         
         try {
             const response = await submitCustomData(data, false);
-            console.log('[DataManager] Duration submitted successfully:', response);
+            if (DEBUG) console.log('[DataManager] Duration submitted successfully:', response);
             return response;
         } catch (error) {
             console.error('[DataManager] Failed to submit duration:', error);
@@ -488,7 +492,7 @@
                 timestamp: Date.now()
             });
             localStorage.setItem(key, serializedData);
-            console.log(`[DataManager] Saved to localStorage:`, key, data);
+            if (DEBUG) console.log(`[DataManager] Saved to localStorage:`, key, data);
         } catch (error) {
             console.error('[DataManager] Failed to save to localStorage:', error);
         }
@@ -522,7 +526,7 @@
                 : keys.filter(key => key.startsWith('beatpass_'));
             
             keysToRemove.forEach(key => localStorage.removeItem(key));
-            console.log(`[DataManager] Cleared localStorage keys:`, keysToRemove);
+            if (DEBUG) console.log(`[DataManager] Cleared localStorage keys:`, keysToRemove);
         } catch (error) {
             console.error('[DataManager] Failed to clear localStorage:', error);
         }
@@ -568,7 +572,7 @@
     function clearCache() {
         apiCache.clear();
         pendingRequests.clear();
-        console.log('[DataManager] Cache cleared');
+        if (DEBUG) console.log('[DataManager] Cache cleared');
     }
     
     function getCacheStats() {
@@ -609,7 +613,7 @@
         
         // Auto-initialization
         init: function() {
-            console.log('[BeatPassDataManager] Standalone data manager module loaded');
+            if (DEBUG) console.log('[BeatPassDataManager] Standalone data manager module loaded');
             initializeCache();
         }
     };

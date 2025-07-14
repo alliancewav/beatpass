@@ -5618,7 +5618,7 @@
             try {
                 this.isMobile = globalObj.innerWidth < 768;
             } catch (error) {
-                console.warn('Could not detect mobile layout, defaulting to desktop:', error);
+                if (DEBUG_MODE) console.warn('Could not detect mobile layout, defaulting to desktop:', error);
                 this.isMobile = false;
             }
             this.observer = null;
@@ -8613,7 +8613,7 @@
                             }
                         }
                     } catch (error) {
-                        console.warn('Error checking mobile layout in calculateCardWidth:', error);
+                        if (DEBUG_MODE) console.warn('Error checking mobile layout in calculateCardWidth:', error);
                     }
                 }
             }
@@ -8652,7 +8652,7 @@
                     try {
                         this.isMobile = globalObj.innerWidth < 768;
                     } catch (error) {
-                        console.warn('Error detecting mobile layout on resize:', error);
+                        if (DEBUG_MODE) console.warn('Error detecting mobile layout on resize:', error);
                         this.isMobile = false;
                     }
                     this.calculateCardWidth();
@@ -8793,7 +8793,7 @@
     try {
         globalObj.addEventListener('beforeunload', cleanup);
     } catch (error) {
-        console.warn('Could not add beforeunload listener:', error);
+        if (DEBUG_MODE) console.warn('Could not add beforeunload listener:', error);
     }
 
     // Expose manual initialization for debugging
@@ -8814,7 +8814,7 @@
         // Expose the module globally
         globalObj.BeatPassPricingModule = BeatPassPricingModule;
     } catch (error) {
-        console.warn('Could not expose global functions:', error);
+        if (DEBUG_MODE) console.warn('Could not expose global functions:', error);
     }
 
     // Start the system safely
